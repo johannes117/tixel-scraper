@@ -18,7 +18,7 @@ smtp_password = os.getenv('SMTP_PASSWORD')
 
 # Email parameters for notification
 from_address = os.getenv('FROM_ADDRESS')
-to_address = os.getenv('TO_ADDRESS')
+to_addresses = os.getenv('TO_ADDRESSES').split(',')  # Assume the addresses are comma-separated in the environment variable
 subject = 'Ticket Availability Alert'
 body = 'Tickets for your event are now available! Check them out at: https://tixel.com/au/music-tickets/2024/04/20/kita-alexander-oxford-art-factor'
 
@@ -37,7 +37,7 @@ def check_tickets():
 def send_email():
     message = MIMEMultipart()
     message['From'] = from_address
-    message['To'] = to_address
+    message['To'] = ', '.join(to_addresses)  # Join the list into a string with commas
     message['Subject'] = subject
     message.attach(MIMEText(body, 'plain'))
 
@@ -46,7 +46,7 @@ def send_email():
         server.starttls()  # Secure the connection
         server.login(smtp_username, smtp_password)
         text = message.as_string()
-        server.sendmail(from_address, to_address, text)
+        server.sendmail(from_address, ', '.join(to_addresses), text)  # Send the email to all addresses
         server.quit()
         print("Email sent successfully!")
     except Exception as e:
@@ -59,7 +59,7 @@ def send_confirmation_email():
 
     confirmation_message = MIMEMultipart()
     confirmation_message['From'] = from_address
-    confirmation_message['To'] = to_address
+    confirmation_message['To'] = ', '.join(to_addresses)  # Join the list into a string with commas
     confirmation_message['Subject'] = confirmation_subject
     confirmation_message.attach(MIMEText(confirmation_body, 'plain'))
 
@@ -68,7 +68,7 @@ def send_confirmation_email():
         server.starttls()  # Secure the connection
         server.login(smtp_username, smtp_password)
         text = confirmation_message.as_string()
-        server.sendmail(from_address, to_address, text)
+        server.sendmail(from_address, ', '.join(to_addresses), text)  # Send the email to all addresses
         server.quit()
         print("Confirmation email sent successfully!")
     except Exception as e:
@@ -96,5 +96,5 @@ if __name__ == '__main__':
             if email_sent:
                 print("Tickets no longer available, resuming normal checks.")
                 email_sent = False  # Reset email sent status
-            print("No tickets available at this time. Waiting 10 minutes before next check...")
-            time.sleep(600)  # Wait for 30 seconds before checking again
+            print("No tickets available at this time. Waiting 1 minute before next check...")
+            time.sleep(60)  # Wait for 30 seconds before checking again
