@@ -21,7 +21,12 @@ smtp_password = os.getenv('SMTP_PASSWORD')
 from_address = os.getenv('FROM_ADDRESS')
 to_addresses = os.getenv('TO_ADDRESSES').split(',')
 subject = 'Ticket Availability Alert'
-body = 'Tickets for your event are now available! Check them out at: https://tixel.com/au/music-tickets/2024/04/20/kita-alexander-oxford-art-factor'
+
+# Tixel URL
+tixel_url = os.getenv('TIXEL_URL')
+
+# Email parameters for notification
+body = f'Tickets for your event are now available! Check them out at: {tixel_url}'
 
 # Twilio credentials
 twilio_account_sid = os.getenv('TWILIO_ACCOUNT_SID')
@@ -31,9 +36,8 @@ to_phone_numbers = os.getenv('TO_PHONE_NUMBERS').split(',')
 
 # Function to check ticket availability
 def check_tickets():
-    url = 'https://tixel.com/au/music-tickets/2024/04/20/kita-alexander-oxford-art-factor'
     headers = eval('{"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"}')
-    response = requests.get(url, headers=headers)
+    response = requests.get(tixel_url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
 
     ticket_available = soup.find_all('div', class_='space-y-3 text-left')
@@ -63,7 +67,7 @@ def send_sms():
     client = Client(twilio_account_sid, twilio_auth_token)
     for phone_number in to_phone_numbers:
         message = client.messages.create(
-            body='Tickets for your event are now available! Check them out at: https://tixel.com/au/music-tickets/2024/04/20/kita-alexander-oxford-art-factor',
+            body=f'Tickets for your event are now available! Check them out at: {tixel_url}',
             from_=twilio_phone_number,
             to=phone_number.strip()
         )
