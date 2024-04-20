@@ -6,6 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 import os
 import time
+from twilio.rest import Client
 
 # Load environment variables from .env file
 load_dotenv()
@@ -18,9 +19,15 @@ smtp_password = os.getenv('SMTP_PASSWORD')
 
 # Email parameters for notification
 from_address = os.getenv('FROM_ADDRESS')
-to_addresses = os.getenv('TO_ADDRESSES').split(',')  # Assume the addresses are comma-separated in the environment variable
+to_addresses = os.getenv('TO_ADDRESSES').split(',')
 subject = 'Ticket Availability Alert'
 body = 'Tickets for your event are now available! Check them out at: https://tixel.com/au/music-tickets/2024/04/20/kita-alexander-oxford-art-factor'
+
+# Twilio credentials
+twilio_account_sid = os.getenv('TWILIO_ACCOUNT_SID')
+twilio_auth_token = os.getenv('TWILIO_AUTH_TOKEN')
+twilio_phone_number = os.getenv('TWILIO_PHONE_NUMBER')
+to_phone_numbers = os.getenv('TO_PHONE_NUMBERS').split(',')
 
 # Function to check ticket availability
 def check_tickets():
@@ -29,72 +36,94 @@ def check_tickets():
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    # Check for the specific div element indicating tickets are available
     ticket_available = soup.find_all('div', class_='space-y-3 text-left')
-    return bool(ticket_available)  # Return True if tickets are available, False otherwise
+    return bool(ticket_available)
 
 # Function to send email
 def send_email():
     message = MIMEMultipart()
     message['From'] = from_address
-    message['To'] = ', '.join(to_addresses)  # Join the list into a string with commas
+    message['To'] = ', '.join(to_addresses)
     message['Subject'] = subject
     message.attach(MIMEText(body, 'plain'))
 
     try:
         server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()  # Secure the connection
+        server.starttls()
         server.login(smtp_username, smtp_password)
         text = message.as_string()
-        server.sendmail(from_address, ', '.join(to_addresses), text)  # Send the email to all addresses
+        server.sendmail(from_address, ', '.join(to_addresses), text)
         server.quit()
         print("Email sent successfully!")
     except Exception as e:
         print(f"Failed to send email: {e}")
 
-# Function to send confirmation email
-def send_confirmation_email():
+# Function to send SMS
+def send_sms():
+    client = Client(twilio_account_sid, twilio_auth_token)
+    for phone_number in to_phone_numbers:
+        message = client.messages.create(
+            body='Tickets for your event are now available! Check them out at: https://tixel.com/au/music-tickets/2024/04/20/kita-alexander-oxford-art-factor',
+            from_=twilio_phone_number,
+            to=phone_number.strip()
+        )
+        print(f"SMS sent successfully to {phone_number}! Message SID: {message.sid}")
+
+# Function to send confirmation email and SMS
+def send_confirmation():
     confirmation_subject = 'Subscription Confirmation'
     confirmation_body = 'You have been subscribed to the Tixel Scraper. It is now running and checking for tickets.'
 
+    # Send confirmation email
     confirmation_message = MIMEMultipart()
     confirmation_message['From'] = from_address
-    confirmation_message['To'] = ', '.join(to_addresses)  # Join the list into a string with commas
+    confirmation_message['To'] = ', '.join(to_addresses)
     confirmation_message['Subject'] = confirmation_subject
     confirmation_message.attach(MIMEText(confirmation_body, 'plain'))
 
     try:
         server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()  # Secure the connection
+        server.starttls()
         server.login(smtp_username, smtp_password)
         text = confirmation_message.as_string()
-        server.sendmail(from_address, ', '.join(to_addresses), text)  # Send the email to all addresses
+        server.sendmail(from_address, ', '.join(to_addresses), text)
         server.quit()
         print("Confirmation email sent successfully!")
     except Exception as e:
         print(f"Failed to send confirmation email: {e}")
 
+    # Send confirmation SMS
+    client = Client(twilio_account_sid, twilio_auth_token)
+    for phone_number in to_phone_numbers:
+        message = client.messages.create(
+            body='You have been subscribed to the Tixel Scraper. It is now running and checking for tickets.',
+            from_=twilio_phone_number,
+            to=phone_number.strip()
+        )
+        print(f"Confirmation SMS sent successfully to {phone_number}! Message SID: {message.sid}")
+
 # Main logic with adaptive checking intervals
 if __name__ == '__main__':
     print("Starting ticket check...")
-    email_sent = False  # Track whether an email has been sent
+    notification_sent = False
 
-    # Send confirmation email
-    send_confirmation_email()
+    # Send confirmation email and SMS
+    send_confirmation()
 
     while True:
         if check_tickets():
-            if not email_sent:
-                print("Tickets found! Sending email...")
+            if not notification_sent:
+                print("Tickets found! Sending notifications...")
                 send_email()
-                email_sent = True
+                send_sms()
+                notification_sent = True
             else:
-                print("Tickets are still available, no new email sent.")
+                print("Tickets are still available, no new notifications sent.")
             print("Waiting 10 minutes before re-checking...")
-            time.sleep(600)  # Wait for 10 minutes before checking again
+            time.sleep(600)
         else:
-            if email_sent:
+            if notification_sent:
                 print("Tickets no longer available, resuming normal checks.")
-                email_sent = False  # Reset email sent status
+                notification_sent = False
             print("No tickets available at this time. Waiting 1 minute before next check...")
-            time.sleep(60)  # Wait for 30 seconds before checking again
+            time.sleep(60)
