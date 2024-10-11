@@ -1,66 +1,108 @@
 # Tixel Scraper
 
-This Python script is designed to check ticket availability for a specific event on Tixel and send notifications via email and SMS when tickets become available.
+Tixel Scraper is a Python application designed to monitor ticket availability on Tixel for specific events. It continuously checks for General Admission Standing tickets and sends email notifications when tickets become available.
 
-## Dependencies
+## Features
 
-The script uses the following Python libraries:
+- Automatic ticket checking at regular intervals
+- Email notifications when tickets are available
+- Fuzzy matching for various ticket type descriptions
+- Logging of all activities and errors
+- Headless operation on a VPS
 
-- `requests`
-- `beautifulsoup4`
-- `smtplib`
-- `email`
-- `dotenv`
-- `os`
-- `time`
-- `twilio`
+## Requirements
 
-## Environment Variables
+- Python 3.10 or higher
+- pip (Python package manager)
+- A VPS or server to run the application
+- Resend API key for sending emails
 
-The script requires the following environment variables to be set:
+## Installation
 
-- `SMTP_SERVER`: The SMTP server for sending emails.
-- `SMTP_PORT`: The SMTP port for sending emails.
-- `SMTP_USERNAME`: The username for the SMTP server.
-- `SMTP_PASSWORD`: The password for the SMTP server.
-- `FROM_ADDRESS`: The email address from which the notifications will be sent.
-- `TO_ADDRESSES`: The email addresses to which the notifications will be sent, separated by commas.
-- `TWILIO_ACCOUNT_SID`: Your Twilio Account SID.
-- `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token.
-- `TWILIO_PHONE_NUMBER`: Your Twilio phone number from which the SMS notifications will be sent.
-- `TO_PHONE_NUMBERS`: The phone numbers to which the SMS notifications will be sent, separated by commas.
-
-## Setup
-
-1. Create a virtual environment:
+1. Clone the repository:
    ```
-   python -m venv venv
+   git clone https://github.com/johannes117/tixel-scraper.git
+   cd tixel-scraper
    ```
 
-2. Activate the virtual environment:
-   - On Windows:
-     ```
-     venv\Scripts\activate
-     ```
-   - On macOS and Linux:
-     ```
-     source venv/bin/activate
-     ```
+2. Create a virtual environment:
+   ```
+   python3 -m venv venv
+   ```
 
-3. Install the required dependencies:
+3. Activate the virtual environment:
+   ```
+   source venv/bin/activate
+   ```
+
+4. Install the required packages:
    ```
    pip install -r requirements.txt
    ```
 
-## How to Run
+5. Create a `.env` file in the project root and add the following environment variables:
+   ```
+   RESEND_API_KEY=your_resend_api_key
+   FROM_ADDRESS=your_from_email_address
+   TO_ADDRESSES=recipient1@example.com,recipient2@example.com
+   TIXEL_URL=https://tixel.com/your/event/url
+   ```
 
-1. Set the required environment variables.
-2. Run the script with `python tixel-scraper.py`.
+## Usage
 
-## How it Works
+### Running the Application
 
-The script continuously checks the ticket availability for a specific event on Tixel. When tickets become available, it sends an email and an SMS notification to the specified recipients. After sending the notifications, it waits for 10 minutes before checking again. If no tickets are available, it waits for 1 minute before the next check.
+1. Start the application:
+   ```
+   ./start_scraper.sh
+   ```
 
-## Note
+2. Stop the application:
+   ```
+   ./stop_scraper.sh
+   ```
+
+### Monitoring
+
+You can monitor the application's activity by checking the log file:
+```
+tail -f tixel_scraper.log
+```
+
+## Deployment
+
+To deploy the Tixel Scraper on a VPS:
+
+1. Connect to your VPS via SSH.
+2. Clone the repository and follow the installation steps above.
+3. Make the start and stop scripts executable:
+   ```
+   chmod +x start_scraper.sh stop_scraper.sh
+   ```
+4. Use the start and stop scripts to manage the application.
+
+## File Structure
+
+- `tixel-scraper.py`: Main application script
+- `start_scraper.sh`: Script to start the application
+- `stop_scraper.sh`: Script to stop the application
+- `requirements.txt`: List of Python package dependencies
+- `.env`: Configuration file for environment variables
+- `email_template.html`: HTML template for notification emails
+- `subscription_confirmation_template.html`: HTML template for subscription confirmation email
+
+## Logging
+
+The application logs its activity to `tixel_scraper.log`. This file uses a rotating file handler, which means it will create new log files and delete old ones to manage disk space.
+
+## Contributing
+
+Contributions to the Tixel Scraper project are welcome. Please feel free to submit pull requests or create issues for bugs and feature requests.
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+## Disclaimer
 
 This script is for educational purposes only. Please respect the terms of service of the websites you are scraping.
