@@ -44,12 +44,20 @@ def check_tickets():
     return False
 
 # Function to send email using Resend
-def send_email(subject, body):
+def send_email(subject, html_file, **kwargs):
+    # Read the HTML template
+    with open(html_file, 'r') as file:
+        html_content = file.read()
+    
+    # Replace any placeholders in the template
+    for key, value in kwargs.items():
+        html_content = html_content.replace(f'{{{{ {key} }}}}', value)
+    
     params = {
         "from": from_address,
         "to": to_addresses,
         "subject": subject,
-        "html": f"<p>{body}</p>"
+        "html": html_content
     }
     
     try:
@@ -60,9 +68,8 @@ def send_email(subject, body):
 
 # Function to send confirmation email
 def send_confirmation():
-    confirmation_subject = 'Subscription Confirmation'
-    confirmation_body = 'You have been subscribed to the Tixel Scraper. It is now running and checking for General Admission Standing tickets.'
-    send_email(confirmation_subject, confirmation_body)
+    confirmation_subject = 'Subscription Confirmation - Tixel Scraper'
+    send_email(confirmation_subject, 'subscription_confirmation_template.html')
 
 # Main logic with adaptive checking intervals
 if __name__ == '__main__':
@@ -76,7 +83,7 @@ if __name__ == '__main__':
         if check_tickets():
             if not notification_sent:
                 print("General Admission Standing tickets found! Sending notification...")
-                send_email(subject, body)
+                send_email('Ticket Availability Alert', 'email_template.html', tixel_url=tixel_url)
                 notification_sent = True
             else:
                 print("General Admission Standing tickets are still available, no new notifications sent.")

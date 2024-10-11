@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket Availability Alert</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .alert {
+            background-color: #e74c3c;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 0.8em;
+            color: #7f8c8d;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ticket Availability Alert</h1>
+        <div class="alert">
+            General Admission Standing tickets are now available!
+        </div>
+        <p>Great news! The tickets you've been waiting for are now available for purchase. Don't miss this opportunity to secure your spot at the event.</p>
+        <p><strong>Ticket Type:</strong> General Admission Standing</p>
+        <p><strong>Action Required:</strong> Visit the ticket sales page as soon as possible to make your purchase. Tickets may sell out quickly!</p>
+        <a href="{{ tixel_url }}" class="btn">Buy Tickets Now</a>
+        <p class="footer">This is an automated message from the Tixel Scraper. If you no longer wish to receive these alerts, please update your notification settings.</p>
+    </div>
+</body>
+</html>
