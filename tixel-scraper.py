@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import os
 import time
 from twilio.rest import Client
+import re
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,7 +27,7 @@ subject = 'Ticket Availability Alert'
 tixel_url = os.getenv('TIXEL_URL')
 
 # Email parameters for notification
-body = f'Tickets for your event are now available! Check them out at: {tixel_url}'
+body = f'General Admission Standing tickets for your event are now available! Check them out at: {tixel_url}'
 
 # Twilio credentials
 twilio_account_sid = os.getenv('TWILIO_ACCOUNT_SID')
@@ -34,14 +35,39 @@ twilio_auth_token = os.getenv('TWILIO_AUTH_TOKEN')
 twilio_phone_number = os.getenv('TWILIO_PHONE_NUMBER')
 to_phone_numbers = os.getenv('TO_PHONE_NUMBERS').split(',')
 
+def fuzzy_match(text, pattern):
+    # Convert both to lowercase for case-insensitive matching
+    text = text.lower()
+    pattern = pattern.lower()
+    
+    # Create a regex pattern for fuzzy matching
+    regex_pattern = r'\b(' + '|'.join(re.escape(word) for word in pattern.split()) + r')\b'
+    
+    # Count the number of words that match
+    matches = re.findall(regex_pattern, text)
+    
+    # If more than half of the words match, consider it a match
+    return len(matches) >= len(pattern.split()) / 2
+
 # Function to check ticket availability
 def check_tickets():
-    headers = eval('{"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"}')
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"}
     response = requests.get(tixel_url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    ticket_available = soup.find_all('div', class_='space-y-3 text-left')
-    return bool(ticket_available)
+    ticket_elements = soup.find_all('div', class_='space-y-3 text-left')
+    
+    for element in ticket_elements:
+        ticket_type = element.find('p', class_='font-semibold')
+        if ticket_type:
+            ticket_text = ticket_type.get_text(strip=True)
+            if fuzzy_match(ticket_text, "GENERAL ADMISSION STANDING") or \
+               fuzzy_match(ticket_text, "GA") or \
+               fuzzy_match(ticket_text, "General Admission") or \
+               fuzzy_match(ticket_text, "Standing"):
+                return True
+    
+    return False
 
 # Function to send email
 def send_email():
@@ -67,7 +93,7 @@ def send_sms():
     client = Client(twilio_account_sid, twilio_auth_token)
     for phone_number in to_phone_numbers:
         message = client.messages.create(
-            body=f'Tickets for your event are now available! Check them out at: {tixel_url}',
+            body=f'General Admission Standing tickets for your event are now available! Check them out at: {tixel_url}',
             from_=twilio_phone_number,
             to=phone_number.strip()
         )
@@ -76,7 +102,7 @@ def send_sms():
 # Function to send confirmation email and SMS
 def send_confirmation():
     confirmation_subject = 'Subscription Confirmation'
-    confirmation_body = 'You have been subscribed to the Tixel Scraper. It is now running and checking for tickets.'
+    confirmation_body = 'You have been subscribed to the Tixel Scraper. It is now running and checking for General Admission Standing tickets.'
 
     # Send confirmation email
     confirmation_message = MIMEMultipart()
@@ -100,7 +126,7 @@ def send_confirmation():
     client = Client(twilio_account_sid, twilio_auth_token)
     for phone_number in to_phone_numbers:
         message = client.messages.create(
-            body='You have been subscribed to the Tixel Scraper. It is now running and checking for tickets.',
+            body='You have been subscribed to the Tixel Scraper. It is now running and checking for General Admission Standing tickets.',
             from_=twilio_phone_number,
             to=phone_number.strip()
         )
@@ -108,7 +134,7 @@ def send_confirmation():
 
 # Main logic with adaptive checking intervals
 if __name__ == '__main__':
-    print("Starting ticket check...")
+    print("Starting ticket check for General Admission Standing...")
     notification_sent = False
 
     # Send confirmation email and SMS
@@ -117,17 +143,17 @@ if __name__ == '__main__':
     while True:
         if check_tickets():
             if not notification_sent:
-                print("Tickets found! Sending notifications...")
+                print("General Admission Standing tickets found! Sending notifications...")
                 send_email()
                 send_sms()
                 notification_sent = True
             else:
-                print("Tickets are still available, no new notifications sent.")
+                print("General Admission Standing tickets are still available, no new notifications sent.")
             print("Waiting 10 minutes before re-checking...")
             time.sleep(600)
         else:
             if notification_sent:
-                print("Tickets no longer available, resuming normal checks.")
+                print("General Admission Standing tickets no longer available, resuming normal checks.")
                 notification_sent = False
-            print("No tickets available at this time. Waiting 1 minute before next check...")
+            print("No General Admission Standing tickets available at this time. Waiting 1 minute before next check...")
             time.sleep(60)
