@@ -30,6 +30,28 @@ The script requires the following environment variables to be set:
 - `TWILIO_PHONE_NUMBER`: Your Twilio phone number from which the SMS notifications will be sent.
 - `TO_PHONE_NUMBERS`: The phone numbers to which the SMS notifications will be sent, separated by commas.
 
+## Setup
+
+1. Create a virtual environment:
+   ```
+   python -m venv venv
+   ```
+
+2. Activate the virtual environment:
+   - On Windows:
+     ```
+     venv\Scripts\activate
+     ```
+   - On macOS and Linux:
+     ```
+     source venv/bin/activate
+     ```
+
+3. Install the required dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+
 ## How to Run
 
 1. Set the required environment variables.

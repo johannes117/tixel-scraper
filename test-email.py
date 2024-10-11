@@ -1,16 +1,12 @@
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
+import resend
+
 # Load environment variables from .env file
 load_dotenv()
 
-# SMTP credentials
-smtp_server = os.getenv('SMTP_SERVER')
-smtp_port = int(os.getenv('SMTP_PORT'))
-smtp_username = os.getenv('SMTP_USERNAME')
-smtp_password = os.getenv('SMTP_PASSWORD')
+# Resend API key
+resend.api_key = os.getenv('RESEND_API_KEY')
 
 # Email parameters
 from_address = os.getenv('FROM_ADDRESS')
@@ -20,21 +16,18 @@ body = 'Hello World'
 
 # Function to send email
 def send_email():
-    message = MIMEMultipart()
-    message['From'] = from_address
-    message['To'] = ', '.join(to_addresses)
-    message['Subject'] = subject
-    message.attach(MIMEText(body, 'plain'))
-    print(f"Sending email to {message['To']}: {message['Subject']}\n{message['From']}\n")
+    params = {
+        "from": from_address,
+        "to": to_addresses,
+        "subject": subject,
+        "html": f"<p>{body}</p>"
+    }
+    
+    print(f"Sending email to {', '.join(to_addresses)}: {subject}\nFrom: {from_address}\n")
 
     try:
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()  # Secure the connection
-        server.login(smtp_username, smtp_password)
-        text = message.as_string()
-        server.sendmail(from_address, ', '.join(to_addresses), text)  # Send the email
-        server.quit()
-        print("Email sent successfully!")
+        email = resend.Emails.send(params)
+        print(f"Email sent successfully! Email ID: {email['id']}")
     except Exception as e:
         print(f"Failed to send email: {e}")
 
