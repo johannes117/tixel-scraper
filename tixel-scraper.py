@@ -23,6 +23,19 @@ tixel_url = os.getenv('TIXEL_URL')
 # Email body for notification
 body = f'General Admission Standing tickets for your event are now available! Check them out at: {tixel_url}'
 
+# Add this function before the check_tickets function
+def fuzzy_match(text, pattern):
+    # Convert both strings to lowercase for case-insensitive matching
+    text = text.lower()
+    pattern = pattern.lower()
+    
+    # Remove non-alphanumeric characters and split into words
+    text_words = re.findall(r'\w+', text)
+    pattern_words = re.findall(r'\w+', pattern)
+    
+    # Check if all pattern words are in the text words
+    return all(word in text_words for word in pattern_words)
+
 # Function to check ticket availability
 def check_tickets():
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"}
