@@ -34,18 +34,6 @@ tixel_url = os.getenv('TIXEL_URL')
 # Email body for notification
 body = f'General Admission Standing tickets for your event are now available! Check them out at: {tixel_url}'
 
-def fuzzy_match(text, pattern):
-    # Convert both strings to lowercase for case-insensitive matching
-    text = text.lower()
-    pattern = pattern.lower()
-    
-    # Remove non-alphanumeric characters and split into words
-    text_words = re.findall(r'\w+', text)
-    pattern_words = re.findall(r'\w+', pattern)
-    
-    # Check if all pattern words are in the text words
-    return all(word in text_words for word in pattern_words)
-
 def check_tickets():
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"}
     response = requests.get(tixel_url, headers=headers)
@@ -53,17 +41,8 @@ def check_tickets():
 
     ticket_elements = soup.find_all('div', class_='space-y-3 text-left')
     
-    for element in ticket_elements:
-        ticket_type = element.find('p', class_='font-semibold')
-        if ticket_type:
-            ticket_text = ticket_type.get_text(strip=True)
-            if fuzzy_match(ticket_text, "GENERAL ADMISSION STANDING") or \
-               fuzzy_match(ticket_text, "GA") or \
-               fuzzy_match(ticket_text, "General Admission") or \
-               fuzzy_match(ticket_text, "Standing"):
-                return True
-    
-    return False
+    # Simply check if any ticket elements exist
+    return len(ticket_elements) > 0
 
 def send_email(subject, html_file, **kwargs):
     # Read the HTML template
@@ -92,7 +71,7 @@ def send_confirmation():
     send_email(confirmation_subject, 'subscription_confirmation_template.html')
 
 if __name__ == '__main__':
-    logger.info("Starting ticket check for General Admission Standing...")
+    logger.info("Starting ticket check...")
     notification_sent = False
 
     # Send confirmation email
@@ -102,18 +81,18 @@ if __name__ == '__main__':
         try:
             if check_tickets():
                 if not notification_sent:
-                    logger.info("General Admission Standing tickets found! Sending notification...")
+                    logger.info("Tickets found! Sending notification...")
                     send_email('Ticket Availability Alert', 'email_template.html', tixel_url=tixel_url)
                     notification_sent = True
                 else:
-                    logger.info("General Admission Standing tickets are still available, no new notifications sent.")
+                    logger.info("Tickets are still available, no new notifications sent.")
                 logger.info("Waiting 10 minutes before re-checking...")
                 time.sleep(600)
             else:
                 if notification_sent:
-                    logger.info("General Admission Standing tickets no longer available, resuming normal checks.")
+                    logger.info("Tickets no longer available, resuming normal checks.")
                     notification_sent = False
-                logger.info("No General Admission Standing tickets available at this time. Waiting 1 minute before next check...")
+                logger.info("No tickets available at this time. Waiting 1 minute before next check...")
                 time.sleep(60)
         except Exception as e:
             logger.error(f"An error occurred: {e}")
