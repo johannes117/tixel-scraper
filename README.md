@@ -20,22 +20,26 @@ Tixel Scraper is a Python application designed to monitor ticket availability on
 ## Installation
 
 1. Clone the repository:
+
    ```
    git clone https://github.com/johannes117/tixel-scraper.git
    cd tixel-scraper
    ```
 
 2. Create a virtual environment:
+
    ```
    python3 -m venv venv
    ```
 
 3. Activate the virtual environment:
+
    ```
    source venv/bin/activate
    ```
 
 4. Install the required packages:
+
    ```
    pip install -r requirements.txt
    ```
@@ -53,6 +57,7 @@ Tixel Scraper is a Python application designed to monitor ticket availability on
 ### Running the Application
 
 1. Start the application:
+
    ```
    ./start_scraper.sh
    ```
@@ -65,6 +70,7 @@ Tixel Scraper is a Python application designed to monitor ticket availability on
 ### Monitoring
 
 You can monitor the application's activity by checking the log file:
+
 ```
 tail -f tixel_scraper.log
 ```
@@ -106,3 +112,11 @@ This project is open source and available under the [MIT License](LICENSE).
 ## Disclaimer
 
 This script is for educational purposes only. Please respect the terms of service of the websites you are scraping.
+
+# Use personal account
+
+$env:AWS_PROFILE = "personal"
+
+# Use work account
+
+$env:AWS_PROFILE = "default" # or whatever your work profile is named

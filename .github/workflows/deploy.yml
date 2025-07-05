@@ -1,12 +1,11 @@
 name: Deploy Tixel Scraper Lambda
 
 on:
-  # Disabled for now - uncomment to re-enable
-  # push:
-  #   branches: [main]
-  # pull_request:
-  #   branches: [main]
-  workflow_dispatch: # Allow manual triggering only
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # Allow manual triggering
 
 env:
   AWS_REGION: ap-southeast-2
@@ -38,6 +37,8 @@ jobs:
           echo "FROM_ADDRESS=test@example.com" >> .env
           echo "TO_ADDRESSES=recipient@example.com" >> .env
           echo "TIXEL_URL=https://tixel.com/test" >> .env
+          echo "MAX_PRICE=100" >> .env
+          echo "DESIRED_QUANTITY=2" >> .env
 
       - name: Run local tests
         run: |
@@ -106,6 +107,8 @@ jobs:
               FromAddress="${{ secrets.FROM_ADDRESS }}" \
               ToAddresses="${{ secrets.TO_ADDRESSES }}" \
               TixelUrl="${{ secrets.TIXEL_URL }}" \
+              MaxPrice="${{ secrets.MAX_PRICE }}" \
+              DesiredQuantity="${{ secrets.DESIRED_QUANTITY }}" \
             --capabilities CAPABILITY_IAM \
             --region ${{ env.AWS_REGION }}
 
