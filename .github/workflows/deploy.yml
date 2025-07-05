@@ -1,11 +1,12 @@
 name: Deploy Tixel Scraper Lambda
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch: # Allow manual triggering
+  # Disabled for now - uncomment to re-enable
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
+  workflow_dispatch: # Allow manual triggering only
 
 env:
   AWS_REGION: ap-southeast-2
