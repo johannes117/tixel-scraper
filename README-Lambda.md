@@ -35,25 +35,36 @@ This serverless solution uses:
    cd tixel-scraper
    ```
 
-2. **Make the deployment script executable**
+2. **Create your configuration file**
+
+   ```bash
+   cp env.example .env
+   # Edit .env with your actual values
+   ```
+
+3. **Configure your .env file**
+
+   ```bash
+   # Example .env content:
+   RESEND_API_KEY=re_abc123xyz
+   FROM_ADDRESS=alerts@mydomain.com
+   TO_ADDRESSES=user1@email.com,user2@email.com
+   TIXEL_URL=https://tixel.com/events/example-event
+   ```
+
+4. **Make the deployment script executable**
 
    ```bash
    chmod +x deploy.sh
    ```
 
-3. **Deploy the Lambda function**
+5. **Deploy the Lambda function**
 
    ```bash
-   ./deploy.sh "your-resend-api-key" "from@email.com" "to@email.com" "https://tixel.com/your-event-url"
+   ./deploy.sh
    ```
 
-   Example:
-
-   ```bash
-   ./deploy.sh "re_abc123xyz" "alerts@mydomain.com" "user1@email.com,user2@email.com" "https://tixel.com/events/example-event"
-   ```
-
-4. **Monitor deployment**
+6. **Monitor deployment**
    The script will output useful commands for monitoring your deployment.
 
 ## 📁 File Structure
@@ -64,7 +75,12 @@ tixel-scraper/
 ├── lambda_requirements.txt         # Python dependencies for Lambda
 ├── cloudformation-template.yaml    # AWS infrastructure template
 ├── deploy.sh                      # Deployment script
+├── env.example                    # Environment variables template
+├── .env                          # Your actual configuration (create from env.example)
+├── test_lambda_local.py           # Local testing script
+├── .github/workflows/deploy.yml   # GitHub Actions CI/CD pipeline
 ├── README-Lambda.md               # This file
+├── README-Testing-CICD.md         # Testing and CI/CD documentation
 └── (original files...)
 ```
 
@@ -166,12 +182,20 @@ aws dynamodb describe-table --table-name tixel-scraper-notification-state
 After modifying `lambda_function.py`, redeploy:
 
 ```bash
-./deploy.sh "your-resend-api-key" "from@email.com" "to@email.com" "https://tixel.com/your-event-url"
+./deploy.sh
 ```
 
 ### Update Configuration
 
-To change email addresses or Tixel URL, redeploy with new parameters.
+To change email addresses, Tixel URL, or other settings:
+
+1. **Edit your .env file** with new values
+2. **Run the update command**:
+   ```bash
+   ./deploy.sh update
+   ```
+
+**Note**: The `update` parameter is optional - the script will automatically detect if the stack exists and update it accordingly.
 
 ### Delete Everything
 
@@ -221,12 +245,31 @@ For issues specific to:
 - **Email delivery**: Verify Resend API key and sender verification
 - **Tixel scraping**: Ensure the URL format hasn't changed
 
+## 🧪 Testing and CI/CD
+
+For local testing and automated deployment setup, see:
+
+- **[Local Testing Guide](README-Testing-CICD.md#-local-testing)** - Test your Lambda function locally before deployment
+- **[CI/CD Pipeline Setup](README-Testing-CICD.md#-github-actions-cicd-pipeline)** - Automated deployment via GitHub Actions
+
+### Quick Local Test
+
+```bash
+# Install dependencies
+pip install -r lambda_requirements.txt python-dotenv
+
+# Run local tests
+python test_lambda_local.py
+```
+
 ## 🎯 Next Steps
 
-1. **Monitor the first few runs** to ensure everything works correctly
-2. **Set up CloudWatch alarms** for Lambda errors (optional)
-3. **Consider adding a dashboard** using CloudWatch or third-party tools
-4. **Customize the email template** for your specific needs
+1. **Test locally** using `python test_lambda_local.py`
+2. **Deploy using the script** or set up GitHub Actions for automated deployment
+3. **Monitor the first few runs** to ensure everything works correctly
+4. **Set up CloudWatch alarms** for Lambda errors (optional)
+5. **Consider adding a dashboard** using CloudWatch or third-party tools
+6. **Customize the email template** for your specific needs
 
 ---
 

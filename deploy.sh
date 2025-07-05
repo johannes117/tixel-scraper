@@ -1,24 +1,64 @@
 #!/bin/bash
 
 # AWS Lambda Deployment Script for Tixel Scraper
-# Usage: ./deploy.sh <resend-api-key> <from-email> <to-emails> <tixel-url>
+# Usage: ./deploy.sh [update]
+# Configuration is read from .env file
 
 set -e
 
-# Check if all required parameters are provided
-if [ $# -ne 4 ]; then
-    echo "Usage: $0 <resend-api-key> <from-email> <to-emails> <tixel-url>"
-    echo "Example: $0 'your-api-key' 'from@example.com' 'to1@example.com,to2@example.com' 'https://tixel.com/your-event'"
+# Function to load environment variables from .env file
+load_env() {
+    if [ -f ".env" ]; then
+        echo "📄 Loading configuration from .env file..."
+        export $(grep -v '^#' .env | xargs)
+    else
+        echo "❌ .env file not found!"
+        echo "Please create a .env file based on env.example:"
+        echo "  cp env.example .env"
+        echo "  # Then edit .env with your actual values"
+        exit 1
+    fi
+}
+
+# Load environment variables
+load_env
+
+# Validate required environment variables
+if [ -z "$RESEND_API_KEY" ] || [ -z "$FROM_ADDRESS" ] || [ -z "$TO_ADDRESSES" ] || [ -z "$TIXEL_URL" ]; then
+    echo "❌ Missing required environment variables in .env file!"
+    echo "Required variables: RESEND_API_KEY, FROM_ADDRESS, TO_ADDRESSES, TIXEL_URL"
     exit 1
 fi
 
-RESEND_API_KEY="$1"
-FROM_EMAIL="$2"
-TO_EMAILS="$3"
-TIXEL_URL="$4"
-STACK_NAME="tixel-scraper"
+# Set default stack name if not provided
+STACK_NAME=${STACK_NAME:-"tixel-scraper"}
+
+# Check if this is an update operation
+UPDATE_MODE=false
+if [ "$1" = "update" ]; then
+    UPDATE_MODE=true
+    echo "🔄 Running in UPDATE mode - will update existing stack"
+else
+    echo "🚀 Running in DEPLOY mode - will create new stack or update if exists"
+fi
 
 echo "🚀 Starting deployment of Tixel Scraper Lambda function..."
+echo "📋 Configuration:"
+echo "  Stack Name: $STACK_NAME"
+echo "  From Address: $FROM_ADDRESS"
+echo "  To Addresses: $TO_ADDRESSES"
+echo "  Tixel URL: $TIXEL_URL"
+echo "  Region: $(aws configure get region)"
+echo ""
+
+# Check if stack already exists
+STACK_EXISTS=false
+if aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" &>/dev/null; then
+    STACK_EXISTS=true
+    echo "📦 Stack '$STACK_NAME' already exists - will update"
+else
+    echo "📦 Stack '$STACK_NAME' does not exist - will create new"
+fi
 
 # Check if AWS CLI is installed
 if ! command -v aws &> /dev/null; then
@@ -74,8 +114,8 @@ aws cloudformation deploy \
     --stack-name "$STACK_NAME" \
     --parameter-overrides \
         ResendApiKey="$RESEND_API_KEY" \
-        FromAddress="$FROM_EMAIL" \
-        ToAddresses="$TO_EMAILS" \
+        FromAddress="$FROM_ADDRESS" \
+        ToAddresses="$TO_ADDRESSES" \
         TixelUrl="$TIXEL_URL" \
     --capabilities CAPABILITY_IAM \
     --region "$REGION"
@@ -103,7 +143,14 @@ echo "🧹 Cleaning up S3 bucket..."
 aws s3 rm "s3://$BUCKET_NAME" --recursive
 aws s3 rb "s3://$BUCKET_NAME"
 
-echo "✅ Deployment completed successfully!"
+if [ "$STACK_EXISTS" = true ]; then
+    echo "✅ Stack update completed successfully!"
+    echo "🔄 Configuration has been updated with your latest .env values"
+else
+    echo "✅ Stack deployment completed successfully!"
+    echo "🎯 The scraper is now running every 60 seconds!"
+fi
+
 echo ""
 echo "📊 Stack Information:"
 echo "Stack Name: $STACK_NAME"
@@ -115,5 +162,8 @@ echo "View logs: aws logs tail /aws/lambda/$FUNCTION_NAME --follow"
 echo "Test function: aws lambda invoke --function-name $FUNCTION_NAME --payload '{}' response.json"
 echo "Check DynamoDB: aws dynamodb scan --table-name $STACK_NAME-notification-state"
 echo ""
-echo "🎯 The scraper is now running every 60 seconds!"
-echo "You can monitor it in the AWS Console under Lambda and CloudWatch." 
+echo "🔧 To update configuration:"
+echo "1. Edit your .env file with new values"
+echo "2. Run: ./deploy.sh update"
+echo ""
+echo "📱 You can monitor it in the AWS Console under Lambda and CloudWatch." 
