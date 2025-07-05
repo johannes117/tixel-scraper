@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Tixel Scraper Lambda Function with DynamoDB and EventBridge Scheduler"
+
+Parameters:
+  ResendApiKey:
+    Type: String
+    Description: "Your Resend API key for sending emails"
+    NoEcho: true
+  FromAddress:
+    Type: String
+    Description: "Email address to send notifications from"
+  ToAddresses:
+    Type: String
+    Description: "Comma-separated list of email addresses to send notifications to"
+  TixelUrl:
+    Type: String
+    Description: "The Tixel URL to monitor for ticket availability"
+
+Resources:
+  # DynamoDB Table for storing notification state
+  NotificationStateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-notification-state"
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      Tags:
+        - Key: Application
+          Value: TixelScraper
+
+  # IAM Role for Lambda Function
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt NotificationStateTable.Arn
+
+  # Lambda Function
+  TixelScraperFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-tixel-scraper"
+      Runtime: python3.9
+      Handler: lambda_function.lambda_handler
+      Code:
+        ZipFile: |
+          # This will be replaced by the deployment script
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Placeholder'}
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref NotificationStateTable
+          RESEND_API_KEY: !Ref ResendApiKey
+          FROM_ADDRESS: !Ref FromAddress
+          TO_ADDRESSES: !Ref ToAddresses
+          TIXEL_URL: !Ref TixelUrl
+      Timeout: 60
+      MemorySize: 256
+      Tags:
+        - Key: Application
+          Value: TixelScraper
+
+  # CloudWatch Log Group
+  TixelScraperLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TixelScraperFunction}"
+      RetentionInDays: 14
+
+  # IAM Role for EventBridge Scheduler
+  SchedulerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt TixelScraperFunction.Arn
+
+  # EventBridge Scheduler to run Lambda every 60 seconds
+  TixelScraperSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub "${AWS::StackName}-tixel-scraper-schedule"
+      Description: "Runs Tixel scraper every 60 seconds"
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      ScheduleExpression: "rate(1 minute)"
+      State: ENABLED
+      Target:
+        Arn: !GetAtt TixelScraperFunction.Arn
+        RoleArn: !GetAtt SchedulerExecutionRole.Arn
+
+  # Lambda Permission for EventBridge Scheduler
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref TixelScraperFunction
+      Action: lambda:InvokeFunction
+      Principal: scheduler.amazonaws.com
+      SourceArn: !GetAtt TixelScraperSchedule.Arn
+
+Outputs:
+  LambdaFunctionName:
+    Description: "Name of the Lambda function"
+    Value: !Ref TixelScraperFunction
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaFunctionName"
+
+  DynamoDBTableName:
+    Description: "Name of the DynamoDB table"
+    Value: !Ref NotificationStateTable
+    Export:
+      Name: !Sub "${AWS::StackName}-DynamoDBTableName"
+
+  ScheduleName:
+    Description: "Name of the EventBridge schedule"
+    Value: !Ref TixelScraperSchedule
+    Export:
+      Name: !Sub "${AWS::StackName}-ScheduleName"
+
+  LogGroupName:
+    Description: "Name of the CloudWatch log group"
+    Value: !Ref TixelScraperLogGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-LogGroupName"
