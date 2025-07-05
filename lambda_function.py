@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import os
 import resend
 import logging
+import re
 
 # Set up logging for Lambda
 logger = logging.getLogger()
@@ -17,50 +18,59 @@ table = dynamodb.Table(os.environ['DYNAMODB_TABLE_NAME'])
 # Resend API key from environment variable
 resend.api_key = os.environ['RESEND_API_KEY']
 
-# Email parameters from environment variables
+# Configuration from environment variables
 from_address = os.environ['FROM_ADDRESS']
 to_addresses = os.environ['TO_ADDRESSES'].split(',')
 tixel_url = os.environ['TIXEL_URL']
+MAX_PRICE = float(os.environ.get('MAX_PRICE', 100.0))
+DESIRED_QUANTITY = int(os.environ.get('DESIRED_QUANTITY', 2))
 
 def lambda_handler(event, context):
     """
     AWS Lambda handler function that checks for ticket availability
-    and sends notifications when tickets are found.
+    based on price and quantity, and sends notifications when found.
     """
-    logger.info("Starting ticket check...")
+    logger.info(f"Starting ticket check for {DESIRED_QUANTITY} tickets at ${MAX_PRICE} or less...")
     
     try:
-        # Check if tickets are available
-        tickets_available = check_tickets()
+        # Check if matching tickets are available
+        found, ticket_details = check_tickets()
         
         # Get current notification state from DynamoDB
         notification_state = get_notification_state()
         
-        if tickets_available:
+        if found:
             if not notification_state['notification_sent']:
-                logger.info("Tickets found! Sending notification...")
-                send_email('Ticket Availability Alert', get_email_template(), tixel_url=tixel_url)
+                logger.info(f"Matching ticket found: {ticket_details}. Sending notification...")
+                send_email(
+                    'Matching Ticket Found!', 
+                    get_email_template(), 
+                    tixel_url=tixel_url,
+                    ticket_type=ticket_details['type'],
+                    ticket_price=ticket_details['price'],
+                    ticket_quantity=ticket_details['quantity']
+                )
                 update_notification_state(True)
                 logger.info("Notification sent and state updated.")
             else:
-                logger.info("Tickets are still available, no new notifications sent.")
+                logger.info("Matching ticket is still available, no new notifications sent.")
         else:
             if notification_state['notification_sent']:
-                logger.info("Tickets no longer available, resetting notification state.")
+                logger.info("Matching tickets no longer available, resetting notification state.")
                 update_notification_state(False)
-            logger.info("No tickets available at this time.")
+            logger.info("No tickets matching criteria were found.")
         
         return {
             'statusCode': 200,
             'body': json.dumps({
                 'message': 'Ticket check completed successfully',
-                'tickets_available': tickets_available,
-                'notification_sent': notification_state['notification_sent']
+                'matching_ticket_found': found,
+                'notification_sent_previously': notification_state['notification_sent']
             })
         }
         
     except Exception as e:
-        logger.error(f"An error occurred: {str(e)}")
+        logger.error(f"An error occurred: {str(e)}", exc_info=True)
         return {
             'statusCode': 500,
             'body': json.dumps({
@@ -71,8 +81,8 @@ def lambda_handler(event, context):
 
 def check_tickets():
     """
-    Check if tickets are available on the Tixel page.
-    Returns True if tickets are found, False otherwise.
+    Checks for tickets matching DESIRED_QUANTITY and MAX_PRICE.
+    Returns (True, ticket_details_dict) if a match is found, otherwise (False, None).
     """
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
@@ -83,26 +93,68 @@ def check_tickets():
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
-        ticket_elements = soup.find_all('div', class_='space-y-3 text-left')
         
-        # Simply check if any ticket elements exist
-        return len(ticket_elements) > 0
+        # Find all button elements which act as containers for ticket listings
+        ticket_listings = soup.select('div[class*="mt-6 space-y-3"] button[class*="rounded-lg"]')
+        
+        if not ticket_listings:
+            logger.info("No ticket listing container found on page.")
+            return False, None
+            
+        logger.info(f"Found {len(ticket_listings)} ticket listings to check.")
+
+        for ticket in ticket_listings:
+            try:
+                # Extract ticket type/description
+                type_element = ticket.find('p', class_='font-semibold')
+                ticket_type = type_element.text.strip() if type_element else "N/A"
+                
+                # Extract the text containing price and quantity
+                details_element = ticket.find('p', class_='text-gray-500')
+                if not details_element:
+                    continue
+                
+                details_text = details_element.text.strip()
+
+                # Parse price using regex
+                price_match = re.search(r'\$(\d+\.?\d*)', details_text)
+                price = float(price_match.group(1)) if price_match else -1
+
+                # Parse quantity using regex
+                quantity_match = re.search(r'(\d+)\s+ticket', details_text)
+                quantity = int(quantity_match.group(1)) if quantity_match else -1
+
+                if price > 0 and quantity > 0:
+                    logger.info(f"Checking ticket: Type='{ticket_type}', Price=${price}, Quantity={quantity}")
+                    # Check if it meets the criteria
+                    if price <= MAX_PRICE and quantity == DESIRED_QUANTITY:
+                        ticket_details = {
+                            "type": ticket_type,
+                            "price": f"{price:.2f}",
+                            "quantity": quantity
+                        }
+                        return True, ticket_details
+                
+            except (AttributeError, ValueError, TypeError) as e:
+                logger.warning(f"Could not parse a ticket listing. Error: {e}. Skipping.")
+                continue
+
+        # If loop completes without finding a match
+        return False, None
         
     except requests.RequestException as e:
         logger.error(f"Error fetching Tixel page: {str(e)}")
-        return False
+        return False, None
 
 def get_notification_state():
     """
     Get the current notification state from DynamoDB.
-    Returns a dictionary with notification_sent boolean.
     """
     try:
         response = table.get_item(Key={'id': 'notification_state'})
         if 'Item' in response:
             return response['Item']
         else:
-            # If no item exists, create default state
             default_state = {'id': 'notification_state', 'notification_sent': False}
             table.put_item(Item=default_state)
             return default_state
@@ -115,28 +167,20 @@ def update_notification_state(notification_sent):
     Update the notification state in DynamoDB.
     """
     try:
-        table.put_item(Item={
-            'id': 'notification_state',
-            'notification_sent': notification_sent
-        })
+        table.put_item(Item={'id': 'notification_state', 'notification_sent': notification_sent})
         logger.info(f"Notification state updated to: {notification_sent}")
     except Exception as e:
         logger.error(f"Error updating notification state: {str(e)}")
 
 def send_email(subject, html_content, **kwargs):
     """
-    Send email notification using Resend API.
+    Send email notification using Resend API, replacing placeholders.
     """
-    # Replace any placeholders in the template
     for key, value in kwargs.items():
-        html_content = html_content.replace(f'{{{{ {key} }}}}', value)
+        # Ensure values are strings for replacement
+        html_content = html_content.replace(f'{{{{ {key} }}}}', str(value))
     
-    params = {
-        "from": from_address,
-        "to": to_addresses,
-        "subject": subject,
-        "html": html_content
-    }
+    params = {"from": from_address, "to": to_addresses, "subject": subject, "html": html_content}
     
     try:
         email = resend.Emails.send(params)
@@ -147,73 +191,7 @@ def send_email(subject, html_content, **kwargs):
 
 def get_email_template():
     """
-    Return the HTML email template as a string.
+    Read the HTML email template from the packaged file.
     """
-    return """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ticket Availability Alert</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .container {
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            padding: 20px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            color: #2c3e50;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
-        }
-        .alert {
-            background-color: #e74c3c;
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
-        .btn {
-            display: inline-block;
-            background-color: #3498db;
-            color: white;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin-top: 20px;
-        }
-        .btn:hover {
-            background-color: #2980b9;
-        }
-        .footer {
-            margin-top: 20px;
-            font-size: 0.8em;
-            color: #7f8c8d;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Ticket Availability Alert</h1>
-        <div class="alert">
-            General Admission Standing tickets are now available!
-        </div>
-        <p>Great news! The tickets you've been waiting for are now available for purchase. Don't miss this opportunity to secure your spot at the event.</p>
-        <p><strong>Ticket Type:</strong> General Admission Standing</p>
-        <p><strong>Action Required:</strong> Visit the ticket sales page as soon as possible to make your purchase. Tickets may sell out quickly!</p>
-        <a href="{{ tixel_url }}" class="btn">Buy Tickets Now</a>
-        <p class="footer">This is an automated message from the Tixel Scraper. If you no longer wish to receive these alerts, please update your notification settings.</p>
-    </div>
-</body>
-</html>""" 
+    with open('email_template.html', 'r') as file:
+        return file.read() 

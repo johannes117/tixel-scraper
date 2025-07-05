@@ -25,21 +25,33 @@
             padding-bottom: 10px;
         }
         .alert {
-            background-color: #e74c3c;
+            background-color: #27ae60;
             color: white;
-            padding: 10px;
+            padding: 15px;
             border-radius: 5px;
             font-weight: bold;
             margin-bottom: 20px;
+            text-align: center;
+            font-size: 1.2em;
+        }
+        .details {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .details strong {
+            color: #34495e;
         }
         .btn {
             display: inline-block;
             background-color: #3498db;
-            color: white;
-            padding: 10px 20px;
+            color: white !important;
+            padding: 12px 25px;
             text-decoration: none;
             border-radius: 5px;
             margin-top: 20px;
+            font-weight: bold;
         }
         .btn:hover {
             background-color: #2980b9;
@@ -56,13 +68,19 @@
     <div class="container">
         <h1>Ticket Availability Alert</h1>
         <div class="alert">
-            General Admission Standing tickets are now available!
+            A matching ticket has been found!
         </div>
-        <p>Great news! The tickets you've been waiting for are now available for purchase. Don't miss this opportunity to secure your spot at the event.</p>
-        <p><strong>Ticket Type:</strong> General Admission Standing</p>
-        <p><strong>Action Required:</strong> Visit the ticket sales page as soon as possible to make your purchase. Tickets may sell out quickly!</p>
+        <p>Great news! We found a ticket listing that matches your criteria. Act fast, as it may sell out quickly!</p>
+        
+        <div class="details">
+            <p><strong>Ticket Type:</strong> {{ ticket_type }}</p>
+            <p><strong>Price:</strong> ${{ ticket_price }} ea</p>
+            <p><strong>Quantity:</strong> {{ ticket_quantity }}</p>
+        </div>
+
+        <p><strong>Action Required:</strong> Visit the Tixel page immediately to make your purchase.</p>
         <a href="{{ tixel_url }}" class="btn">Buy Tickets Now</a>
-        <p class="footer">This is an automated message from the Tixel Scraper. If you no longer wish to receive these alerts, please update your notification settings.</p>
+        <p class="footer">This is an automated message from the Tixel Scraper. To stop receiving alerts, disable the EventBridge schedule in your AWS console.</p>
     </div>
 </body>
 </html>

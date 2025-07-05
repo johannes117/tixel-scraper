@@ -15,6 +15,14 @@ Parameters:
   TixelUrl:
     Type: String
     Description: "The Tixel URL to monitor for ticket availability"
+  MaxPrice:
+    Type: Number
+    Description: "The maximum price per ticket you are willing to pay"
+    Default: 100
+  DesiredQuantity:
+    Type: Number
+    Description: "The exact number of tickets you are looking for in a single listing"
+    Default: 2
 
 Resources:
   # DynamoDB Table for storing notification state
@@ -78,6 +86,8 @@ Resources:
           FROM_ADDRESS: !Ref FromAddress
           TO_ADDRESSES: !Ref ToAddresses
           TIXEL_URL: !Ref TixelUrl
+          MAX_PRICE: !Ref MaxPrice
+          DESIRED_QUANTITY: !Ref DesiredQuantity
       Timeout: 60
       MemorySize: 256
       Tags:

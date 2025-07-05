@@ -24,9 +24,9 @@ load_env() {
 load_env
 
 # Validate required environment variables
-if [ -z "$RESEND_API_KEY" ] || [ -z "$FROM_ADDRESS" ] || [ -z "$TO_ADDRESSES" ] || [ -z "$TIXEL_URL" ]; then
+if [ -z "$RESEND_API_KEY" ] || [ -z "$FROM_ADDRESS" ] || [ -z "$TO_ADDRESSES" ] || [ -z "$TIXEL_URL" ] || [ -z "$MAX_PRICE" ] || [ -z "$DESIRED_QUANTITY" ]; then
     echo "❌ Missing required environment variables in .env file!"
-    echo "Required variables: RESEND_API_KEY, FROM_ADDRESS, TO_ADDRESSES, TIXEL_URL"
+    echo "Required variables: RESEND_API_KEY, FROM_ADDRESS, TO_ADDRESSES, TIXEL_URL, MAX_PRICE, DESIRED_QUANTITY"
     exit 1
 fi
 
@@ -48,6 +48,8 @@ echo "  Stack Name: $STACK_NAME"
 echo "  From Address: $FROM_ADDRESS"
 echo "  To Addresses: $TO_ADDRESSES"
 echo "  Tixel URL: $TIXEL_URL"
+echo "  Max Price: $MAX_PRICE"
+echo "  Desired Quantity: $DESIRED_QUANTITY"
 echo "  Region: $(aws configure get region)"
 echo ""
 
@@ -81,6 +83,7 @@ echo "📦 Creating deployment package in $TEMP_DIR"
 # Copy Lambda function code
 cp lambda_function.py "$TEMP_DIR/"
 cp lambda_requirements.txt "$TEMP_DIR/requirements.txt"
+cp email_template.html "$TEMP_DIR/" # Copy email template to package
 
 # Install dependencies
 echo "📥 Installing Python dependencies..."
@@ -117,6 +120,8 @@ aws cloudformation deploy \
         FromAddress="$FROM_ADDRESS" \
         ToAddresses="$TO_ADDRESSES" \
         TixelUrl="$TIXEL_URL" \
+        MaxPrice="$MAX_PRICE" \
+        DesiredQuantity="$DESIRED_QUANTITY" \
     --capabilities CAPABILITY_IAM \
     --region "$REGION"
 
