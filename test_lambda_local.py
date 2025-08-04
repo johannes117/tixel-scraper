@@ -58,6 +58,8 @@ def test_lambda_function():
     os.environ['FROM_ADDRESS'] = os.getenv('FROM_ADDRESS', 'test@example.com')
     os.environ['TO_ADDRESSES'] = os.getenv('TO_ADDRESSES', 'recipient@example.com')
     os.environ['TIXEL_URL'] = os.getenv('TIXEL_URL', 'https://tixel.com/test')
+    os.environ['MAX_PRICE'] = os.getenv('MAX_PRICE', '100')
+    os.environ['DESIRED_QUANTITY'] = os.getenv('DESIRED_QUANTITY', '2')
     
     # Mock AWS services
     mock_dynamodb = MockDynamoDBResource()
@@ -80,6 +82,8 @@ def test_lambda_function():
                 print(f"📧 From: {os.environ['FROM_ADDRESS']}")
                 print(f"📧 To: {os.environ['TO_ADDRESSES']}")
                 print(f"🔗 URL: {os.environ['TIXEL_URL']}")
+                print(f"💰 Max Price: ${os.environ['MAX_PRICE']}")
+                print(f"🎫 Desired Quantity: {os.environ['DESIRED_QUANTITY']}")
                 print("-" * 50)
                 
                 # Run the lambda function
@@ -109,8 +113,15 @@ def test_with_mock_tickets():
     
     print("\n🎫 Testing with MOCK TICKETS AVAILABLE...")
     
-    # Mock the check_tickets function to return True
-    with patch('lambda_function.check_tickets', return_value=True):
+    # Mock the check_tickets function to return True with sample ticket details
+    mock_ticket_details = {
+        "type": "General Admission",
+        "price": "85.00",
+        "quantity": 2
+    }
+    
+    # Mock the check_tickets function to return (True, ticket_details)
+    with patch('lambda_function.check_tickets', return_value=(True, mock_ticket_details)):
         result = test_lambda_function()
         
     return result
@@ -120,8 +131,20 @@ def test_without_tickets():
     
     print("\n🚫 Testing with NO TICKETS AVAILABLE...")
     
-    # Mock the check_tickets function to return False
-    with patch('lambda_function.check_tickets', return_value=False):
+    # Mock the check_tickets function to return (False, None)
+    with patch('lambda_function.check_tickets', return_value=(False, None)):
+        result = test_lambda_function()
+        
+    return result
+
+def test_with_non_matching_tickets():
+    """Test the function with tickets that don't match criteria"""
+    
+    print("\n🎫 Testing with TICKETS THAT DON'T MATCH CRITERIA...")
+    print("   (Simulating tickets available but price/quantity don't match)")
+    
+    # Mock the check_tickets function to return (False, None) - no matching tickets
+    with patch('lambda_function.check_tickets', return_value=(False, None)):
         result = test_lambda_function()
         
     return result
@@ -138,15 +161,18 @@ def main():
         print("Please create a .env file based on env.example")
         return
     
-    # Test both scenarios
+    # Test different scenarios
     print("\n1️⃣ Testing normal execution (real ticket check)...")
     test_lambda_function()
     
-    print("\n2️⃣ Testing with mock tickets available...")
+    print("\n2️⃣ Testing with mock tickets that match criteria...")
     test_with_mock_tickets()
     
     print("\n3️⃣ Testing with no tickets available...")
     test_without_tickets()
+    
+    print("\n4️⃣ Testing with tickets that don't match criteria...")
+    test_with_non_matching_tickets()
     
     print("\n✅ Local testing completed!")
     print("\n💡 Tips:")
@@ -154,6 +180,7 @@ def main():
     print("- The function uses your real .env configuration")
     print("- Email sending is mocked (no actual emails sent)")
     print("- DynamoDB operations are mocked locally")
+    print("- Tests now include criteria-based filtering")
 
 if __name__ == "__main__":
     main() 
