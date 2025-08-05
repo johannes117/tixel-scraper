@@ -1,28 +1,34 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Tixel Scraper Lambda Function with DynamoDB and EventBridge Scheduler"
+Description: "Tixel Scraper: A serverless function to monitor Tixel for tickets based on price and quantity."
 
 Parameters:
   ResendApiKey:
     Type: String
-    Description: "Your Resend API key for sending emails"
+    Description: "Your Resend API key for sending emails."
     NoEcho: true
   FromAddress:
     Type: String
-    Description: "Email address to send notifications from"
+    Description: "Email address to send notifications from."
   ToAddresses:
     Type: String
-    Description: "Comma-separated list of email addresses to send notifications to"
+    Description: "Comma-separated list of email addresses to send notifications to."
   TixelUrl:
     Type: String
-    Description: "The Tixel URL to monitor for ticket availability"
+    Description: "The Tixel URL to monitor for ticket availability."
   MaxPrice:
     Type: Number
-    Description: "The maximum price per ticket you are willing to pay"
+    Description: "The maximum price per ticket you are willing to pay."
     Default: 100
   DesiredQuantity:
     Type: Number
-    Description: "The exact number of tickets you are looking for in a single listing"
+    Description: "The exact number of tickets you are looking for in a single listing."
     Default: 2
+  LambdaCodeS3Bucket:
+    Type: String
+    Description: "The S3 bucket containing the Lambda deployment package."
+  LambdaCodeS3Key:
+    Type: String
+    Description: "The S3 key of the Lambda deployment package."
 
 Resources:
   # DynamoDB Table for storing notification state
@@ -74,10 +80,8 @@ Resources:
       Runtime: python3.9
       Handler: lambda_function.lambda_handler
       Code:
-        ZipFile: |
-          # This will be replaced by the deployment script
-          def lambda_handler(event, context):
-              return {'statusCode': 200, 'body': 'Placeholder'}
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
       Role: !GetAtt LambdaExecutionRole.Arn
       Environment:
         Variables:
@@ -94,7 +98,7 @@ Resources:
         - Key: Application
           Value: TixelScraper
 
-  # CloudWatch Log Group
+  # CloudWatch Log Group for the Lambda Function
   TixelScraperLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -122,12 +126,12 @@ Resources:
                   - lambda:InvokeFunction
                 Resource: !GetAtt TixelScraperFunction.Arn
 
-  # EventBridge Scheduler to run Lambda every 60 seconds
+  # EventBridge Scheduler to run the Lambda function every minute
   TixelScraperSchedule:
     Type: AWS::Scheduler::Schedule
     Properties:
       Name: !Sub "${AWS::StackName}-tixel-scraper-schedule"
-      Description: "Runs Tixel scraper every 60 seconds"
+      Description: "Runs the Tixel scraper function every minute."
       FlexibleTimeWindow:
         Mode: "OFF"
       ScheduleExpression: "rate(1 minute)"
@@ -136,7 +140,7 @@ Resources:
         Arn: !GetAtt TixelScraperFunction.Arn
         RoleArn: !GetAtt SchedulerExecutionRole.Arn
 
-  # Lambda Permission for EventBridge Scheduler
+  # Lambda Permission for EventBridge Scheduler to invoke it
   LambdaInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -149,23 +153,9 @@ Outputs:
   LambdaFunctionName:
     Description: "Name of the Lambda function"
     Value: !Ref TixelScraperFunction
-    Export:
-      Name: !Sub "${AWS::StackName}-LambdaFunctionName"
-
   DynamoDBTableName:
     Description: "Name of the DynamoDB table"
     Value: !Ref NotificationStateTable
-    Export:
-      Name: !Sub "${AWS::StackName}-DynamoDBTableName"
-
   ScheduleName:
     Description: "Name of the EventBridge schedule"
     Value: !Ref TixelScraperSchedule
-    Export:
-      Name: !Sub "${AWS::StackName}-ScheduleName"
-
-  LogGroupName:
-    Description: "Name of the CloudWatch log group"
-    Value: !Ref TixelScraperLogGroup
-    Export:
-      Name: !Sub "${AWS::StackName}-LogGroupName"

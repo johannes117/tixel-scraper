@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# AWS Lambda Deployment Script for Tixel Scraper
-# Usage: ./deploy.sh [update]
-# Configuration is read from .env file
+# Deployment script for the Tixel Scraper serverless application.
+# This script packages the Lambda function, uploads it to a dedicated S3 bucket,
+# and deploys/updates the CloudFormation stack.
 
 set -e
 
@@ -13,105 +13,84 @@ load_env() {
         export $(grep -v '^#' .env | xargs)
     else
         echo "❌ .env file not found!"
-        echo "Please create a .env file based on env.example:"
-        echo "  cp env.example .env"
-        echo "  # Then edit .env with your actual values"
+        echo "Please create a .env file from the example: cp .env.example .env"
         exit 1
     fi
 }
 
-# Load environment variables
+# --- Script Start ---
+
+# 1. Load and Validate Configuration
 load_env
 
-# Validate required environment variables
-if [ -z "$RESEND_API_KEY" ] || [ -z "$FROM_ADDRESS" ] || [ -z "$TO_ADDRESSES" ] || [ -z "$TIXEL_URL" ] || [ -z "$MAX_PRICE" ] || [ -z "$DESIRED_QUANTITY" ]; then
-    echo "❌ Missing required environment variables in .env file!"
-    echo "Required variables: RESEND_API_KEY, FROM_ADDRESS, TO_ADDRESSES, TIXEL_URL, MAX_PRICE, DESIRED_QUANTITY"
-    exit 1
-fi
+REQUIRED_VARS=("RESEND_API_KEY" "FROM_ADDRESS" "TO_ADDRESSES" "TIXEL_URL" "MAX_PRICE" "DESIRED_QUANTITY")
+for var in "${REQUIRED_VARS[@]}"; do
+    if [ -z "${!var}" ]; then
+        echo "❌ Missing required environment variable in .env file: $var"
+        exit 1
+    fi
+done
 
-# Set default stack name if not provided
+# Set defaults if not provided
 STACK_NAME=${STACK_NAME:-"tixel-scraper"}
-
-# Check if this is an update operation
-UPDATE_MODE=false
-if [ "$1" = "update" ]; then
-    UPDATE_MODE=true
-    echo "🔄 Running in UPDATE mode - will update existing stack"
-else
-    echo "🚀 Running in DEPLOY mode - will create new stack or update if exists"
+REGION=${AWS_REGION:-$(aws configure get region)}
+if [ -z "$REGION" ]; then
+    REGION="us-east-1"
+    echo "⚠️ AWS region not set, defaulting to us-east-1."
 fi
 
-echo "🚀 Starting deployment of Tixel Scraper Lambda function..."
-echo "📋 Configuration:"
-echo "  Stack Name: $STACK_NAME"
-echo "  From Address: $FROM_ADDRESS"
-echo "  To Addresses: $TO_ADDRESSES"
-echo "  Tixel URL: $TIXEL_URL"
-echo "  Max Price: $MAX_PRICE"
-echo "  Desired Quantity: $DESIRED_QUANTITY"
-echo "  Region: $(aws configure get region)"
-echo ""
+echo "🚀 Starting deployment of Tixel Scraper..."
+echo "-------------------------------------------"
+echo "📋 Stack Name:       $STACK_NAME"
+echo "🌍 AWS Region:        $REGION"
+echo "🔗 Tixel URL:         $TIXEL_URL"
+echo "💰 Max Price:         $MAX_PRICE"
+echo "🎫 Desired Quantity:  $DESIRED_QUANTITY"
+echo "-------------------------------------------"
 
-# Check if stack already exists
-STACK_EXISTS=false
-if aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" &>/dev/null; then
-    STACK_EXISTS=true
-    echo "📦 Stack '$STACK_NAME' already exists - will update"
-else
-    echo "📦 Stack '$STACK_NAME' does not exist - will create new"
-fi
-
-# Check if AWS CLI is installed
+# 2. Check Prerequisites
 if ! command -v aws &> /dev/null; then
     echo "❌ AWS CLI is not installed. Please install it first."
     exit 1
 fi
-
-# Check if AWS credentials are configured
 if ! aws sts get-caller-identity &> /dev/null; then
     echo "❌ AWS credentials not configured. Please run 'aws configure' first."
     exit 1
 fi
 
-echo "✅ AWS CLI is configured"
-
-# Create a temporary directory for packaging
+# 3. Package Lambda Function
 TEMP_DIR=$(mktemp -d)
-echo "📦 Creating deployment package in $TEMP_DIR"
-
-# Copy Lambda function code
+echo "📦 Creating deployment package in temporary directory..."
 cp lambda_function.py "$TEMP_DIR/"
 cp lambda_requirements.txt "$TEMP_DIR/requirements.txt"
-cp email_template.html "$TEMP_DIR/" # Copy email template to package
+cp email_template.html "$TEMP_DIR/"
 
-# Install dependencies
-echo "📥 Installing Python dependencies..."
 cd "$TEMP_DIR"
-pip install -r requirements.txt -t .
+echo "📥 Installing Python dependencies..."
+pip install -r requirements.txt -t . > /dev/null
+zip -r ../lambda-deployment-package.zip . > /dev/null
+cd - > /dev/null
+echo "✅ Deployment package created: lambda-deployment-package.zip"
 
-# Create deployment package
-echo "📦 Creating deployment package..."
-zip -r lambda-deployment-package.zip . -x "*.pyc" "__pycache__/*"
+# 4. Upload to S3
+# Use a persistent, uniquely named bucket for CloudFormation artifacts.
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+S3_BUCKET="cf-artifacts-${STACK_NAME}-${ACCOUNT_ID}-${REGION}"
+LAMBDA_ZIP_KEY="lambda-deployment-package.zip"
 
-# Upload to S3 (create bucket if it doesn't exist)
-BUCKET_NAME="tixel-scraper-lambda-$(date +%s)"
-REGION=$(aws configure get region)
-if [ -z "$REGION" ]; then
-    REGION="us-east-1"
+echo "S3_BUCKET"
+if ! aws s3api head-bucket --bucket "$S3_BUCKET" &>/dev/null; then
+    echo "📤 S3 bucket '$S3_BUCKET' not found. Creating it..."
+    aws s3 mb "s3://$S3_BUCKET" --region "$REGION"
+else
+    echo "✅ Using existing S3 bucket: $S3_BUCKET"
 fi
 
-echo "📤 Creating S3 bucket: $BUCKET_NAME"
-aws s3 mb "s3://$BUCKET_NAME" --region "$REGION"
+echo "📤 Uploading deployment package to s3://${S3_BUCKET}/${LAMBDA_ZIP_KEY}..."
+aws s3 cp lambda-deployment-package.zip "s3://${S3_BUCKET}/${LAMBDA_ZIP_KEY}"
 
-echo "📤 Uploading deployment package to S3..."
-aws s3 cp lambda-deployment-package.zip "s3://$BUCKET_NAME/"
-
-# Go back to original directory
-cd - > /dev/null
-
-# Deploy CloudFormation stack
-echo "🏗️  Deploying CloudFormation stack..."
+# 5. Deploy CloudFormation Stack
+echo "🏗️ Deploying CloudFormation stack... (This may take a few minutes)"
 aws cloudformation deploy \
     --template-file cloudformation-template.yaml \
     --stack-name "$STACK_NAME" \
@@ -122,53 +101,26 @@ aws cloudformation deploy \
         TixelUrl="$TIXEL_URL" \
         MaxPrice="$MAX_PRICE" \
         DesiredQuantity="$DESIRED_QUANTITY" \
+        LambdaCodeS3Bucket="$S3_BUCKET" \
+        LambdaCodeS3Key="$LAMBDA_ZIP_KEY" \
     --capabilities CAPABILITY_IAM \
-    --region "$REGION"
+    --region "$REGION" \
+    --no-fail-on-empty-changeset
 
-# Update Lambda function code
-echo "🔄 Updating Lambda function code..."
-FUNCTION_NAME=$(aws cloudformation describe-stacks \
-    --stack-name "$STACK_NAME" \
-    --query "Stacks[0].Outputs[?OutputKey=='LambdaFunctionName'].OutputValue" \
-    --output text \
-    --region "$REGION")
-
-aws lambda update-function-code \
-    --function-name "$FUNCTION_NAME" \
-    --s3-bucket "$BUCKET_NAME" \
-    --s3-key "lambda-deployment-package.zip" \
-    --region "$REGION"
-
-# Clean up temporary files
-echo "🧹 Cleaning up temporary files..."
+# 6. Clean up local files
+echo "🧹 Cleaning up local temporary files..."
 rm -rf "$TEMP_DIR"
+rm lambda-deployment-package.zip
 
-# Clean up S3 bucket
-echo "🧹 Cleaning up S3 bucket..."
-aws s3 rm "s3://$BUCKET_NAME" --recursive
-aws s3 rb "s3://$BUCKET_NAME"
-
-if [ "$STACK_EXISTS" = true ]; then
-    echo "✅ Stack update completed successfully!"
-    echo "🔄 Configuration has been updated with your latest .env values"
-else
-    echo "✅ Stack deployment completed successfully!"
-    echo "🎯 The scraper is now running every 60 seconds!"
-fi
-
+# 7. Final Output
+echo "✅ Deployment completed successfully!"
+echo "🎯 The scraper is now running every minute."
 echo ""
-echo "📊 Stack Information:"
-echo "Stack Name: $STACK_NAME"
-echo "Function Name: $FUNCTION_NAME"
-echo "Region: $REGION"
-echo ""
-echo "📋 Useful Commands:"
-echo "View logs: aws logs tail /aws/lambda/$FUNCTION_NAME --follow"
-echo "Test function: aws lambda invoke --function-name $FUNCTION_NAME --payload '{}' response.json"
-echo "Check DynamoDB: aws dynamodb scan --table-name $STACK_NAME-notification-state"
-echo ""
-echo "🔧 To update configuration:"
-echo "1. Edit your .env file with new values"
-echo "2. Run: ./deploy.sh update"
-echo ""
-echo "📱 You can monitor it in the AWS Console under Lambda and CloudWatch." 
+echo "---"
+echo "📊 Useful Commands:"
+FUNCTION_NAME=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='LambdaFunctionName'].OutputValue" --output text --region "$REGION")
+echo "  - View Logs:    aws logs tail /aws/lambda/$FUNCTION_NAME --follow"
+echo "  - Pause Scraper:  aws scheduler update-schedule --name ${STACK_NAME}-tixel-scraper-schedule --state DISABLED"
+echo "  - Resume Scraper: aws scheduler update-schedule --name ${STACK_NAME}-tixel-scraper-schedule --state ENABLED"
+echo "  - Delete Stack:   aws cloudformation delete-stack --stack-name $STACK_NAME"
+echo "---"

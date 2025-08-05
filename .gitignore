@@ -1,5 +1,17 @@
+# Environment variables
 .env
-venv/*
-tixel_scraper.log
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Log files
 *.log
 scraper.pid
+
+# Deployment artifacts
+lambda-deployment-package.zip
+
+# macOS
+.DS_Store
