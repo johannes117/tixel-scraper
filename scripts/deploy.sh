@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Deployment script for the Tixel Scraper serverless application.
-# This script packages the Lambda function, uploads it to a dedicated S3 bucket,
-# and deploys/updates the CloudFormation stack.
+# This script is designed to be run from the project root.
 
 set -e
 
@@ -12,7 +11,7 @@ load_env() {
         echo "📄 Loading configuration from .env file..."
         export $(grep -v '^#' .env | xargs)
     else
-        echo "❌ .env file not found!"
+        echo "❌ .env file not found in project root!"
         echo "Please create a .env file from the example: cp .env.example .env"
         exit 1
     fi
@@ -58,16 +57,16 @@ if ! aws sts get-caller-identity &> /dev/null; then
     exit 1
 fi
 
-# 3. Package Lambda Function
+# 3. Package Lambda Function from 'src' directory
 TEMP_DIR=$(mktemp -d)
-echo "📦 Creating deployment package in temporary directory..."
-cp lambda_function.py "$TEMP_DIR/"
-cp lambda_requirements.txt "$TEMP_DIR/requirements.txt"
-cp email_template.html "$TEMP_DIR/"
+echo "📦 Creating deployment package from 'src' directory..."
+# Copy source files to a temporary directory for packaging
+cp -r src/* "$TEMP_DIR/"
 
 cd "$TEMP_DIR"
 echo "📥 Installing Python dependencies..."
-pip install -r requirements.txt -t . > /dev/null
+pip install -r lambda_requirements.txt -t . > /dev/null
+# Important: Zip contents from within the directory to avoid a top-level folder in the zip
 zip -r ../lambda-deployment-package.zip . > /dev/null
 cd - > /dev/null
 echo "✅ Deployment package created: lambda-deployment-package.zip"
@@ -78,7 +77,6 @@ ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 S3_BUCKET="cf-artifacts-${STACK_NAME}-${ACCOUNT_ID}-${REGION}"
 LAMBDA_ZIP_KEY="lambda-deployment-package.zip"
 
-echo "S3_BUCKET"
 if ! aws s3api head-bucket --bucket "$S3_BUCKET" &>/dev/null; then
     echo "📤 S3 bucket '$S3_BUCKET' not found. Creating it..."
     aws s3 mb "s3://$S3_BUCKET" --region "$REGION"
@@ -92,7 +90,7 @@ aws s3 cp lambda-deployment-package.zip "s3://${S3_BUCKET}/${LAMBDA_ZIP_KEY}"
 # 5. Deploy CloudFormation Stack
 echo "🏗️ Deploying CloudFormation stack... (This may take a few minutes)"
 aws cloudformation deploy \
-    --template-file cloudformation-template.yaml \
+    --template-file infra/cloudformation-template.yaml \
     --stack-name "$STACK_NAME" \
     --parameter-overrides \
         ResendApiKey="$RESEND_API_KEY" \

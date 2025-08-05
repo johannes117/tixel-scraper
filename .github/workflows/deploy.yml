@@ -1,8 +1,6 @@
 name: Deploy Tixel Scraper Lambda
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch: # Allow manual triggering
@@ -28,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r lambda_requirements.txt
-          pip install python-dotenv
+          pip install -r src/lambda_requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Create test .env file
         run: |
@@ -40,15 +38,15 @@ jobs:
           echo "MAX_PRICE=100" >> .env
           echo "DESIRED_QUANTITY=2" >> .env
 
-      - name: Run local tests
+      - name: Run tests
         run: |
-          python test_lambda_local.py
+          pytest
 
   deploy:
     runs-on: ubuntu-latest
     name: Deploy to AWS
     needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'workflow_dispatch'
     environment: default
 
     steps:
@@ -76,8 +74,8 @@ jobs:
         run: |
           # Create temporary directory
           mkdir -p deployment
-          cp lambda_function.py deployment/
-          cp lambda_requirements.txt deployment/requirements.txt
+          cp -r src/* deployment/
+          cp src/lambda_requirements.txt deployment/requirements.txt
 
           # Install dependencies in deployment directory
           cd deployment
@@ -101,7 +99,7 @@ jobs:
       - name: Deploy CloudFormation stack
         run: |
           aws cloudformation deploy \
-            --template-file cloudformation-template.yaml \
+            --template-file infra/cloudformation-template.yaml \
             --stack-name ${{ env.STACK_NAME }} \
             --parameter-overrides \
               ResendApiKey="${{ secrets.RESEND_API_KEY }}" \
@@ -110,21 +108,9 @@ jobs:
               TixelUrl="${{ secrets.TIXEL_URL }}" \
               MaxPrice="${{ secrets.MAX_PRICE }}" \
               DesiredQuantity="${{ secrets.DESIRED_QUANTITY }}" \
+              LambdaCodeS3Bucket="${{ steps.upload.outputs.BUCKET_NAME }}" \
+              LambdaCodeS3Key="lambda-deployment-package.zip" \
             --capabilities CAPABILITY_IAM \
-            --region ${{ env.AWS_REGION }}
-
-      - name: Update Lambda function code
-        run: |
-          FUNCTION_NAME=$(aws cloudformation describe-stacks \
-            --stack-name ${{ env.STACK_NAME }} \
-            --query "Stacks[0].Outputs[?OutputKey=='LambdaFunctionName'].OutputValue" \
-            --output text \
-            --region ${{ env.AWS_REGION }})
-            
-          aws lambda update-function-code \
-            --function-name "$FUNCTION_NAME" \
-            --s3-bucket "${{ steps.upload.outputs.BUCKET_NAME }}" \
-            --s3-key "lambda-deployment-package.zip" \
             --region ${{ env.AWS_REGION }}
 
       - name: Clean up S3 bucket

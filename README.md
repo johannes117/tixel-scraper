@@ -23,7 +23,8 @@ This setup typically falls within the **AWS Free Tier**, making it virtually fre
 - **Stateful Notifications**: Remembers when a notification has been sent to avoid spam.
 - **Easy Deployment**: A single script deploys or updates the entire stack.
 - **Automated & Reliable**: Runs automatically on a schedule set by you.
-- **Extensive Documentation**: Clear instructions for deployment, management, and testing.
+- **Professional Testing**: Uses pytest for comprehensive test coverage.
+- **Clean Architecture**: Well-organized folder structure for maintainability.
 
 ## Prerequisites
 
@@ -82,11 +83,11 @@ DESIRED_QUANTITY=2
 
 ### 3. Deploy the Application
 
-Run the deployment script. It will package the code, set up all the necessary AWS resources, and deploy the application.
+Make the deployment script executable and run it from the project root.
 
 ```bash
-chmod +x deploy.sh
-./deploy.sh
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
 ```
 
 The script will create a dedicated S3 bucket for artifacts, package your Lambda function, and deploy the CloudFormation stack. The scraper will be active immediately after the script finishes.
@@ -116,7 +117,7 @@ If you want to change the Tixel URL, price, or email addresses:
 2. Re-run the deployment script:
 
 ```bash
-./deploy.sh
+./scripts/deploy.sh
 ```
 
 The script will automatically detect the existing stack and update it with the new configuration.
@@ -139,48 +140,75 @@ aws cloudformation delete-stack --stack-name tixel-scraper
 
 ## Local Development & Testing
 
-A comprehensive testing suite is included to allow you to validate your changes locally before deploying.
+This project uses pytest for robust local testing.
 
 ### 1. Install Dependencies
 
-```bash
-pip install -r lambda_requirements.txt
-pip install python-dotenv
-```
-
-### 2. Run the Test Suite
-
-Use the interactive test runner to test different components of the application independently.
+Install the main application dependencies and the development-only dependencies.
 
 ```bash
-python run_tests.py
+# Install Lambda dependencies
+pip install -r src/lambda_requirements.txt
+
+# Install testing dependencies
+pip install -r requirements-dev.txt
 ```
 
-You can choose to test:
+### 2. Run Tests
 
-- **Web Scraping**: To check if the scraper can still parse the Tixel website correctly.
+Ensure your .env file is configured, then run pytest from the project root. pytest will automatically discover and run all tests in the tests directory.
 
-- **Email Sending**: To verify your Resend configuration by sending a real test email.
+```bash
+pytest
+```
 
-- **Full Lambda Logic**: To run a mocked end-to-end test of the Lambda handler.
+The tests will mock all external services (like AWS and Resend), so they run quickly and won't incur costs or send real emails.
+
+For more verbose output:
+
+```bash
+pytest -v
+```
+
+For coverage reporting:
+
+```bash
+pytest --cov=src
+```
 
 ## Project Structure
 
 ```
 .
-├── .github/workflows/deploy.yml    # Optional: CI/CD pipeline for automated deployments
-├── .gitignore
-├── .env.example                    # Template for environment variables
-├── cloudformation-template.yaml    # AWS infrastructure definition (IaC)
-├── deploy.sh                       # Script for manual deployment
-├── email_template.html             # HTML template for email notifications
-├── lambda_function.py              # The core Python scraper logic
-├── lambda_requirements.txt         # Python dependencies for the Lambda function
-├── run_tests.py                    # Interactive test runner
-├── test_email.py                   # Standalone test for email sending
-├── test_lambda_local.py            # Local test for the Lambda handler
-└── test_scraping.py                # Standalone test for the scraping logic
+├── .github/workflows/deploy.yml    # CI/CD pipeline (optional)
+├── infra/
+│   └── cloudformation-template.yaml  # Infrastructure definition
+├── scripts/
+│   └── deploy.sh                   # Deployment script
+├── src/
+│   ├── email_template.html         # Email notification template
+│   ├── lambda_function.py          # Core application logic
+│   └── lambda_requirements.txt     # Lambda dependencies
+├── tests/
+│   ├── __init__.py                 # Makes tests a Python package
+│   └── test_lambda_handler.py      # Comprehensive test suite
+├── .env.example                    # Configuration template
+├── .gitignore                      # Git ignore rules
+├── README.md                       # This file
+└── requirements-dev.txt            # Development dependencies
 ```
+
+## Testing Strategy
+
+The test suite covers all major scenarios:
+
+- ✅ **First-time ticket discovery**: Sends notification and updates state
+- ✅ **No tickets found**: No notification, no state change
+- ✅ **Already notified**: No duplicate notifications
+- ✅ **State reset**: Resets when tickets disappear
+- ✅ **Error handling**: Graceful failure handling
+
+All tests use mocks to avoid external dependencies and costs.
 
 ## Security Considerations
 
@@ -188,7 +216,7 @@ You can choose to test:
 
 - **IAM Roles**: The resources (Lambda, Scheduler) are configured with narrowly scoped IAM roles to follow the principle of least privilege.
 
-- **Dependencies**: Dependencies are managed in lambda_requirements.txt. It's good practice to periodically check for vulnerabilities.
+- **Dependencies**: Dependencies are managed in src/lambda_requirements.txt. It's good practice to periodically check for vulnerabilities.
 
 ## Disclaimer
 
