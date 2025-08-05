@@ -11,6 +11,8 @@ import re
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+
 # Initialize AWS clients
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['DYNAMODB_TABLE_NAME'])
@@ -65,7 +67,7 @@ def lambda_handler(event, context):
             'body': json.dumps({
                 'message': 'Ticket check completed successfully.',
                 'matching_ticket_found': found,
-                'notification_sent_previously': notification_state['notification_sent']
+                'notification_sent_previously': notification_state.get('notification_sent', False)
             })
         }
 
@@ -191,5 +193,6 @@ def send_email(subject, html_content, **kwargs):
 
 def get_email_template():
     """Reads the HTML email template from the packaged file."""
-    with open('email_template.html', 'r') as file:
+    template_path = os.path.join(SCRIPT_DIR, 'email_template.html')
+    with open(template_path, 'r') as file:
         return file.read()

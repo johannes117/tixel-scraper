@@ -25,36 +25,33 @@ def mock_lambda_context():
     return context
 
 @pytest.fixture
-def mock_dynamodb_table(mocker):
-    """Mocks the DynamoDB table resource."""
-    mock_table = MagicMock()
-    # Use a dictionary to simulate the DynamoDB table's state
-    db_state = {}
+def mock_table(mocker):
+    """
+    Mocks the DynamoDB table object by patching it directly in the
+    lambda_function module where it's used. This is the correct way to mock it.
+    """
+    mocked_table = mocker.patch('src.lambda_function.table')
+    return mocked_table
 
-    def get_item_side_effect(Key):
-        item_id = Key['id']
-        if item_id in db_state:
-            return {'Item': db_state[item_id]}
-        return {}
+@pytest.fixture(autouse=True)
+def mock_email_template(mocker):
+    """
+    Mocks the file reading for the email template for all tests.
+    This prevents the FileNotFoundError and makes tests independent of the file system.
+    """
+    mocker.patch('src.lambda_function.get_email_template', return_value="<html>Mock Email</html>")
 
-    def put_item_side_effect(Item):
-        db_state[Item['id']] = Item
 
-    mock_table.get_item.side_effect = get_item_side_effect
-    mock_table.put_item.side_effect = put_item_side_effect
-
-    mocker.patch('boto3.resource').return_value.Table.return_value = mock_table
-    return mock_table
-
-def test_tickets_found_first_time(mocker, mock_dynamodb_table, mock_lambda_context):
+def test_tickets_found_first_time(mocker, mock_table, mock_lambda_context):
     """
     Tests the scenario where a matching ticket is found for the first time.
     """
     # Arrange: Mock external calls
     mock_check_tickets = mocker.patch('src.lambda_function.check_tickets', return_value=(True, {"type": "GA", "price": "90.00", "quantity": 2}))
     mock_send_email = mocker.patch('src.lambda_function.send_email')
-    # Start with a state where notification has not been sent
-    mock_dynamodb_table.get_item.return_value = {'Item': {'notification_sent': False}}
+    
+    # Configure the DynamoDB mock to return a state where notification has not been sent
+    mock_table.get_item.return_value = {'Item': {'id': 'notification_state', 'notification_sent': False}}
 
     # Act: Run the handler
     result = lambda_function.lambda_handler({}, mock_lambda_context)
@@ -68,16 +65,16 @@ def test_tickets_found_first_time(mocker, mock_dynamodb_table, mock_lambda_conte
     mock_check_tickets.assert_called_once()
     mock_send_email.assert_called_once()
     # Assert that the state was updated to True
-    mock_dynamodb_table.put_item.assert_called_with(Item={'id': 'notification_state', 'notification_sent': True})
+    mock_table.put_item.assert_called_with(Item={'id': 'notification_state', 'notification_sent': True})
 
-def test_tickets_not_found(mocker, mock_dynamodb_table, mock_lambda_context):
+def test_tickets_not_found(mocker, mock_table, mock_lambda_context):
     """
     Tests the scenario where no matching tickets are found.
     """
     # Arrange
     mock_check_tickets = mocker.patch('src.lambda_function.check_tickets', return_value=(False, None))
     mock_send_email = mocker.patch('src.lambda_function.send_email')
-    mock_dynamodb_table.get_item.return_value = {'Item': {'notification_sent': False}}
+    mock_table.get_item.return_value = {'Item': {'id': 'notification_state', 'notification_sent': False}}
 
     # Act
     result = lambda_function.lambda_handler({}, mock_lambda_context)
@@ -89,17 +86,18 @@ def test_tickets_not_found(mocker, mock_dynamodb_table, mock_lambda_context):
     
     mock_check_tickets.assert_called_once()
     mock_send_email.assert_not_called()
-    mock_dynamodb_table.put_item.assert_not_called() # State should not change
+    mock_table.put_item.assert_not_called() # State should not change
 
-def test_tickets_found_but_already_notified(mocker, mock_dynamodb_table, mock_lambda_context):
+def test_tickets_found_but_already_notified(mocker, mock_table, mock_lambda_context):
     """
     Tests that no new email is sent if a notification was already sent.
     """
     # Arrange
     mocker.patch('src.lambda_function.check_tickets', return_value=(True, {"type": "GA", "price": "90.00", "quantity": 2}))
     mock_send_email = mocker.patch('src.lambda_function.send_email')
-    # Start with a state where notification HAS been sent
-    mock_dynamodb_table.get_item.return_value = {'Item': {'notification_sent': True}}
+    
+    # Configure the DynamoDB mock to return a state where notification HAS been sent
+    mock_table.get_item.return_value = {'Item': {'id': 'notification_state', 'notification_sent': True}}
 
     # Act
     result = lambda_function.lambda_handler({}, mock_lambda_context)
@@ -109,22 +107,25 @@ def test_tickets_found_but_already_notified(mocker, mock_dynamodb_table, mock_la
     assert json.loads(result['body'])['matching_ticket_found'] is True
     
     mock_send_email.assert_not_called()
-    mock_dynamodb_table.put_item.assert_not_called()
+    mock_table.put_item.assert_not_called()
 
-def test_tickets_gone_resets_state(mocker, mock_dynamodb_table, mock_lambda_context):
+def test_tickets_gone_resets_state(mocker, mock_table, mock_lambda_context):
     """
     Tests that the notification state is reset when tickets are no longer available.
     """
     # Arrange
     mocker.patch('src.lambda_function.check_tickets', return_value=(False, None))
     mock_send_email = mocker.patch('src.lambda_function.send_email')
-    # Start with a state where notification HAS been sent
-    mock_dynamodb_table.get_item.return_value = {'Item': {'notification_sent': True}}
+
+    # Configure the DynamoDB mock to return a state where notification HAS been sent
+    mock_table.get_item.return_value = {'Item': {'id': 'notification_state', 'notification_sent': True}}
 
     # Act
-    lambda_function.lambda_handler({}, mock_lambda_context)
+    result = lambda_function.lambda_handler({}, mock_lambda_context)
 
     # Assert
+    assert result['statusCode'] == 200
     mock_send_email.assert_not_called()
+
     # Assert that the state was reset to False
-    mock_dynamodb_table.put_item.assert_called_with(Item={'id': 'notification_state', 'notification_sent': False})
+    mock_table.put_item.assert_called_with(Item={'id': 'notification_state', 'notification_sent': False})
