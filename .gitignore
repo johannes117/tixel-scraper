@@ -1,17 +1,26 @@
-# Environment variables
-.env
+# Configuration files with secrets
+config.yaml
 
 # Python
 venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Log files
+# Application state and logs
+state.json
 *.log
-scraper.pid
-
-# Deployment artifacts
-lambda-deployment-package.zip
+*.log.*
 
 # macOS
 .DS_Store
+
+# Windows
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

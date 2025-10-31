@@ -1,0 +1,19 @@
+[Unit]
+Description=Tixel Ticket Scraper
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME/tixel-scraper
+ExecStart=/home/YOUR_USERNAME/tixel-scraper/venv/bin/python /home/YOUR_USERNAME/tixel-scraper/main.py
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tixel-scraper
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,0 @@
-# Dependencies for local testing and development
-pytest
-pytest-mock
-python-dotenv
-boto3-stubs[dynamodb]  # For editor autocompletion with boto3

@@ -1,223 +1,231 @@
-# Tixel Ticket Scraper (Serverless AWS Version)
+# Tixel Ticket Scraper
 
-A cost-effective, serverless application that runs on AWS to automatically monitor ticket availability on Tixel. It sends you an email notification the moment tickets matching your specific criteria (price and quantity) are found.
-
-## How It Works (Architecture)
-
-This solution is built on a serverless AWS architecture, which is highly efficient and cost-effective.
-
-- **AWS Lambda**: Executes the Python scraping code on a schedule without needing a dedicated server.
-- **Amazon EventBridge Scheduler**: Triggers the Lambda function at a defined interval (e.g., every minute).
-- **Amazon DynamoDB**: Stores the notification state to prevent sending duplicate emails for the same ticket listing.
-- **AWS CloudFormation**: Defines and deploys all the necessary AWS resources in a single, manageable stack.
-- **Amazon S3**: Stores the Lambda function's deployment package.
-- **Amazon CloudWatch**: Collects logs for monitoring and debugging.
-- **Resend API**: Used to send email notifications.
-
-This setup typically falls within the **AWS Free Tier**, making it virtually free to run for low-frequency checks.
+A Python-based ticket monitoring application that automatically checks Tixel for ticket availability and sends email notifications when tickets matching your criteria (price and quantity) become available.
 
 ## Features
 
-- **Serverless & Cost-Effective**: No need to manage servers. Costs are minimal to zero.
-- **Criteria-Based Filtering**: Finds tickets based on your desired quantity and maximum price.
-- **Stateful Notifications**: Remembers when a notification has been sent to avoid spam.
-- **Easy Deployment**: A single script deploys or updates the entire stack.
-- **Automated & Reliable**: Runs automatically on a schedule set by you.
-- **Professional Testing**: Uses pytest for comprehensive test coverage.
-- **Clean Architecture**: Well-organized folder structure for maintainability.
+- **Continuous Monitoring**: Long-running script that checks Tixel at configurable intervals
+- **Criteria-Based Filtering**: Finds tickets based on your desired quantity and maximum price
+- **Smart Notifications**: Remembers when a notification has been sent to avoid spam
+- **Easy Configuration**: Simple YAML configuration file for all settings
+- **Robust Logging**: Rotating log files with configurable log levels
+- **Systemd Integration**: Run as a background service on Ubuntu with automatic restart
+- **Graceful Shutdown**: Properly handles stop signals for clean exits
 
 ## Prerequisites
 
-Before you begin, ensure you have the following:
+- Ubuntu VPS (or any Linux system with systemd)
+- Python 3.9 or higher
+- A Resend API Key for sending email notifications (get one from [resend.com](https://resend.com))
+- Git installed on your VPS
 
-1.  An **AWS Account** with access keys configured.
-2.  **AWS CLI** installed and configured on your machine.
-    ```bash
-    aws configure
-    ```
-3.  **Python 3.9+** installed.
-4.  A **Resend API Key** for sending email notifications. You can get one from [resend.com](https://resend.com).
-
-## Quick Start: Deployment
-
-Follow these steps to deploy the Tixel Scraper to your AWS account.
+## Quick Start
 
 ### 1. Clone the Repository
+
+SSH into your VPS and clone the repository:
 
 ```bash
 git clone https://github.com/your-username/tixel-scraper.git
 cd tixel-scraper
 ```
 
-### 2. Configure Environment Variables
+### 2. Run the Setup Script
 
-Create a .env file by copying the example. This file will store your secrets and configuration.
-
-```bash
-cp .env.example .env
-```
-
-Now, edit the .env file with your details:
-
-```dotenv
-# .env
-
-# Resend API Key (get from https://resend.com/api-keys)
-RESEND_API_KEY=your-resend-api-key-here
-
-# Email addresses
-FROM_ADDRESS=notifications@yourdomain.com
-TO_ADDRESSES=your-email@example.com,another-email@example.com
-
-# Tixel URL to monitor
-TIXEL_URL=https://tixel.com/au/music-tickets/your-event-name
-
-# Your criteria for the tickets
-MAX_PRICE=150
-DESIRED_QUANTITY=2
-
-# Optional: AWS Stack Name and Region
-# STACK_NAME=tixel-scraper
-# AWS_REGION=us-east-1
-```
-
-### 3. Deploy the Application
-
-Make the deployment script executable and run it from the project root.
+The setup script will install dependencies, create a virtual environment, and set up the systemd service:
 
 ```bash
-chmod +x scripts/deploy.sh
-./scripts/deploy.sh
+chmod +x setup.sh
+./setup.sh
 ```
 
-The script will create a dedicated S3 bucket for artifacts, package your Lambda function, and deploy the CloudFormation stack. The scraper will be active immediately after the script finishes.
+### 3. Configure the Scraper
+
+Edit the `config.yaml` file with your settings:
+
+```bash
+nano config.yaml
+```
+
+Update the following values:
+
+```yaml
+email:
+  resend_api_key: "your-resend-api-key-here"
+  from_address: "notifications@yourdomain.com"
+  to_addresses:
+    - "your-email@example.com"
+
+scraper:
+  tixel_url: "https://tixel.com/au/music-tickets/your-event"
+  max_price: 150.0
+  desired_quantity: 2
+  poll_interval: 60  # seconds between checks
+
+logging:
+  log_file: "tixel-scraper.log"
+  log_level: "INFO"
+```
+
+### 4. Test the Scraper
+
+Before running as a service, test it manually:
+
+```bash
+./main.py
+```
+
+Press `Ctrl+C` to stop. Check that it's working correctly by monitoring the output.
+
+### 5. Enable and Start the Service
+
+Once you've confirmed it works, enable and start the systemd service:
+
+```bash
+sudo systemctl enable tixel-scraper
+sudo systemctl start tixel-scraper
+```
 
 ## Managing the Scraper
 
-You can easily control the scraper without having to redeploy.
-
-### Pause or Resume the Scraper
-
-To temporarily stop the scraper (e.g., after you've bought tickets), you can disable the EventBridge schedule. This is the recommended way to pause the service, and it's free.
-
-```bash
-# To PAUSE (replace tixel-scraper with your stack name if you changed it)
-aws scheduler update-schedule --name tixel-scraper-tixel-scraper-schedule --state DISABLED
-
-# To RESUME
-aws scheduler update-schedule --name tixel-scraper-tixel-scraper-schedule --state ENABLED
-```
-
-### Update the Configuration
-
-If you want to change the Tixel URL, price, or email addresses:
-
-1. Edit your .env file.
-
-2. Re-run the deployment script:
-
-```bash
-./scripts/deploy.sh
-```
-
-The script will automatically detect the existing stack and update it with the new configuration.
-
 ### View Logs
 
-You can monitor the scraper's activity and check for errors by viewing the CloudWatch logs. The deploy.sh script will output the correct command, but it generally looks like this:
+View live logs from the service:
 
 ```bash
-aws logs tail /aws/lambda/tixel-scraper-tixel-scraper --follow
+sudo journalctl -u tixel-scraper -f
 ```
 
-### Permanently Delete the Scraper
-
-If you no longer need the scraper, you can delete all associated AWS resources by deleting the CloudFormation stack.
+Or tail the local log file:
 
 ```bash
-aws cloudformation delete-stack --stack-name tixel-scraper
+tail -f tixel-scraper.log
 ```
 
-## Local Development & Testing
-
-This project uses pytest for robust local testing.
-
-### 1. Install Dependencies
-
-Install the main application dependencies and the development-only dependencies.
+### Check Status
 
 ```bash
-# Install Lambda dependencies
-pip install -r src/lambda_requirements.txt
-
-# Install testing dependencies
-pip install -r requirements-dev.txt
+sudo systemctl status tixel-scraper
 ```
 
-### 2. Run Tests
-
-Ensure your .env file is configured, then run pytest from the project root. pytest will automatically discover and run all tests in the tests directory.
+### Stop the Scraper
 
 ```bash
-pytest
+sudo systemctl stop tixel-scraper
 ```
 
-The tests will mock all external services (like AWS and Resend), so they run quickly and won't incur costs or send real emails.
+### Restart the Scraper
 
-For more verbose output:
+After changing configuration, restart the service:
 
 ```bash
-pytest -v
+sudo systemctl restart tixel-scraper
 ```
 
-For coverage reporting:
+### Disable Auto-Start
 
 ```bash
-pytest --cov=src
+sudo systemctl disable tixel-scraper
 ```
+
+## Configuration Options
+
+### Email Settings
+
+- `resend_api_key`: Your Resend API key
+- `from_address`: Email address to send notifications from (must be verified in Resend)
+- `to_addresses`: List of email addresses to receive notifications
+
+### Scraper Settings
+
+- `tixel_url`: The Tixel event page to monitor
+- `max_price`: Maximum price per ticket you're willing to pay
+- `desired_quantity`: Exact number of tickets you want
+- `poll_interval`: How often to check for tickets (in seconds)
+
+### Logging Settings
+
+- `log_file`: Path to the log file
+- `log_level`: Logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+## How It Works
+
+1. **Monitoring**: The script continuously polls the Tixel URL at your specified interval
+2. **Matching**: When tickets are found, it checks if they match your price and quantity criteria
+3. **State Management**: A local `state.json` file tracks whether a notification has been sent
+4. **Notification**: When matching tickets are found for the first time, an email is sent
+5. **Reset**: When tickets disappear, the state resets so you'll be notified of new matches
 
 ## Project Structure
 
 ```
 .
-├── .github/workflows/deploy.yml    # CI/CD pipeline (optional)
-├── infra/
-│   └── cloudformation-template.yaml  # Infrastructure definition
-├── scripts/
-│   └── deploy.sh                   # Deployment script
-├── src/
-│   ├── email_template.html         # Email notification template
-│   ├── lambda_function.py          # Core application logic
-│   └── lambda_requirements.txt     # Lambda dependencies
-├── tests/
-│   ├── __init__.py                 # Makes tests a Python package
-│   └── test_lambda_handler.py      # Comprehensive test suite
-├── .env.example                    # Configuration template
-├── .gitignore                      # Git ignore rules
-├── README.md                       # This file
-└── requirements-dev.txt            # Development dependencies
+├── main.py                    # Main application script
+├── config.yaml                # Configuration file
+├── email_template.html        # Email notification template
+├── requirements.txt           # Python dependencies
+├── setup.sh                   # Setup script for VPS
+├── tixel-scraper.service      # Systemd service file template
+├── state.json                 # Notification state (auto-generated)
+├── tixel-scraper.log          # Log file (auto-generated)
+└── README.md                  # This file
 ```
 
-## Testing Strategy
+## Troubleshooting
 
-The test suite covers all major scenarios:
+### Scraper Won't Start
 
-- ✅ **First-time ticket discovery**: Sends notification and updates state
-- ✅ **No tickets found**: No notification, no state change
-- ✅ **Already notified**: No duplicate notifications
-- ✅ **State reset**: Resets when tickets disappear
-- ✅ **Error handling**: Graceful failure handling
+Check the logs for errors:
 
-All tests use mocks to avoid external dependencies and costs.
+```bash
+sudo journalctl -u tixel-scraper -n 50
+```
+
+Common issues:
+- Invalid `config.yaml` syntax
+- Missing or incorrect Resend API key
+- Python dependencies not installed correctly
+
+### No Emails Being Sent
+
+1. Verify your Resend API key is correct
+2. Ensure the `from_address` is verified in your Resend account
+3. Check the logs for email sending errors
+4. Verify the scraper is finding tickets (check logs)
+
+### High CPU Usage
+
+Increase the `poll_interval` in `config.yaml` to reduce check frequency.
+
+### Permission Errors
+
+Ensure the service is running as the correct user and has permissions to write to the log file and state file.
+
+## Updating the Scraper
+
+To update to the latest version:
+
+```bash
+cd ~/tixel-scraper
+sudo systemctl stop tixel-scraper
+git pull
+source venv/bin/activate
+pip install -r requirements.txt
+deactivate
+sudo systemctl start tixel-scraper
+```
 
 ## Security Considerations
 
-- **Secrets Management**: API keys and other secrets are loaded from a local .env file (which is git-ignored) and passed to AWS CloudFormation as secure parameters.
-
-- **IAM Roles**: The resources (Lambda, Scheduler) are configured with narrowly scoped IAM roles to follow the principle of least privilege.
-
-- **Dependencies**: Dependencies are managed in src/lambda_requirements.txt. It's good practice to periodically check for vulnerabilities.
+- **Configuration Security**: Keep your `config.yaml` file secure as it contains your API key
+- **HTTPS**: The scraper uses HTTPS for all web requests
+- **Rate Limiting**: Be respectful of Tixel's servers by not setting too aggressive a poll interval
+- **Firewall**: Consider restricting outbound connections to only necessary domains
 
 ## Disclaimer
 
-This script is for personal, educational purposes only. Web scraping can be against the terms of service of a website. Please ensure you are not violating Tixel's ToS. The creators of this script are not responsible for any misuse.
+This script is for personal, educational purposes only. Web scraping may be against the terms of service of some websites. Please ensure you are not violating Tixel's Terms of Service. The creators of this script are not responsible for any misuse.
+
+## License
+
+MIT License - feel free to use and modify as needed.

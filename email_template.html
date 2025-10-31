@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matching Ticket Found</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #f4f4f4; border-radius: 10px; padding: 30px; margin: 20px 0;">
+        <h1 style="color: #2c3e50; margin-top: 0;">🎫 Matching Ticket Found!</h1>
+
+        <p style="font-size: 16px; margin-bottom: 20px;">
+            Great news! A ticket matching your criteria has been found on Tixel.
+        </p>
+
+        <div style="background-color: white; border-left: 4px solid #3498db; padding: 15px; margin: 20px 0; border-radius: 5px;">
+            <p style="margin: 5px 0;"><strong>Type:</strong> {{ ticket_type }}</p>
+            <p style="margin: 5px 0;"><strong>Price:</strong> ${{ ticket_price }}</p>
+            <p style="margin: 5px 0;"><strong>Quantity:</strong> {{ ticket_quantity }} ticket(s)</p>
+        </div>
+
+        <p style="margin-top: 30px;">
+            <a href="{{ tixel_url }}"
+               style="background-color: #3498db; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+                View Tickets on Tixel
+            </a>
+        </p>
+
+        <p style="font-size: 14px; color: #7f8c8d; margin-top: 30px;">
+            Act fast! These tickets may sell quickly.
+        </p>
+    </div>
+
+    <p style="font-size: 12px; color: #95a5a6; text-align: center; margin-top: 20px;">
+        This notification was sent by your Tixel Scraper.<br>
+        You will not receive another notification until these tickets are sold and new matching tickets appear.
+    </p>
+</body>
+</html>
