@@ -56,36 +56,24 @@ pip install -r requirements.txt
 deactivate
 echo ""
 
-# Check if config.yaml exists
-if [ ! -f "config.yaml" ]; then
-    echo "Creating config.yaml from template..."
-    cat > config.yaml << 'EOF'
-# Tixel Scraper Configuration File
-# Adjust the values below to match your needs
-
-# Email notification settings (using Resend API)
-email:
-  resend_api_key: "your-resend-api-key-here"
-  from_address: "notifications@yourdomain.com"
-  to_addresses:
-    - "user@email.com"
-
-# Tixel URL to monitor
-scraper:
-  tixel_url: "https://tixel.com/au/music-tickets/your-event"
-  max_price: 150.0
-  desired_quantity: 2
-  # How often to check for tickets (in seconds)
-  poll_interval: 60
-
-# Logging configuration
-logging:
-  log_file: "tixel-scraper.log"
-  log_level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
-EOF
-    echo "config.yaml created. Please edit it with your settings before starting the scraper."
+# Check if .env exists
+if [ ! -f ".env" ]; then
+    echo "Creating .env from .env.example..."
+    cp .env.example .env
+    echo ".env file created. IMPORTANT: Edit it with your Resend API key before starting the scraper."
+    echo "  nano .env"
 else
-    echo "config.yaml already exists. Skipping creation."
+    echo ".env file already exists. Skipping creation."
+fi
+echo ""
+
+# Config.yaml should already exist in the repo, but check anyway
+if [ ! -f "config.yaml" ]; then
+    echo "WARNING: config.yaml not found! This file should be in the repository."
+    echo "Please ensure config.yaml exists before running the scraper."
+else
+    echo "config.yaml found. You can edit it to customize your settings:"
+    echo "  nano config.yaml"
 fi
 echo ""
 
@@ -134,14 +122,17 @@ echo "Setup Complete!"
 echo "======================================"
 echo ""
 echo "Next steps:"
-echo "1. Edit config.yaml with your settings:"
+echo "1. Edit .env with your Resend API key:"
+echo "   nano .env"
+echo ""
+echo "2. Edit config.yaml with your settings (URL, price, quantity, etc):"
 echo "   nano config.yaml"
 echo ""
-echo "2. Test the scraper manually:"
+echo "3. Test the scraper manually:"
 echo "   ./main.py"
 echo "   (Press Ctrl+C to stop)"
 echo ""
-echo "3. Once working, enable and start the service:"
+echo "4. Once working, enable and start the service:"
 echo "   sudo systemctl enable tixel-scraper"
 echo "   sudo systemctl start tixel-scraper"
 echo ""

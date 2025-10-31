@@ -41,7 +41,20 @@ chmod +x setup.sh
 
 ### 3. Configure the Scraper
 
-Edit the `config.yaml` file with your settings:
+First, create and edit your `.env` file with your Resend API key:
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Add your Resend API key:
+
+```bash
+RESEND_API_KEY=your-actual-api-key-here
+```
+
+Then, edit the `config.yaml` file with your settings:
 
 ```bash
 nano config.yaml
@@ -51,7 +64,6 @@ Update the following values:
 
 ```yaml
 email:
-  resend_api_key: "your-resend-api-key-here"
   from_address: "notifications@yourdomain.com"
   to_addresses:
     - "your-email@example.com"
@@ -130,9 +142,12 @@ sudo systemctl disable tixel-scraper
 
 ## Configuration Options
 
-### Email Settings
+### Environment Variables (.env file)
 
-- `resend_api_key`: Your Resend API key
+- `RESEND_API_KEY`: Your Resend API key (from https://resend.com/api-keys)
+
+### Email Settings (config.yaml)
+
 - `from_address`: Email address to send notifications from (must be verified in Resend)
 - `to_addresses`: List of email addresses to receive notifications
 
@@ -161,7 +176,9 @@ sudo systemctl disable tixel-scraper
 ```
 .
 ├── main.py                    # Main application script
-├── config.yaml                # Configuration file
+├── config.yaml                # Configuration file (tracked in git)
+├── .env                       # Environment variables with secrets (not tracked)
+├── .env.example               # Example .env file (tracked in git)
 ├── email_template.html        # Email notification template
 ├── requirements.txt           # Python dependencies
 ├── setup.sh                   # Setup script for VPS
@@ -182,8 +199,8 @@ sudo journalctl -u tixel-scraper -n 50
 ```
 
 Common issues:
+- Missing `.env` file or invalid Resend API key
 - Invalid `config.yaml` syntax
-- Missing or incorrect Resend API key
 - Python dependencies not installed correctly
 
 ### No Emails Being Sent
@@ -217,7 +234,9 @@ sudo systemctl start tixel-scraper
 
 ## Security Considerations
 
-- **Configuration Security**: Keep your `config.yaml` file secure as it contains your API key
+- **API Key Security**: Your Resend API key is stored in `.env` which is git-ignored and never committed
+- **File Permissions**: Ensure `.env` has appropriate permissions (600) to prevent unauthorized access
+- **Configuration**: The `config.yaml` file is safe to commit as it contains no secrets
 - **HTTPS**: The scraper uses HTTPS for all web requests
 - **Rate Limiting**: Be respectful of Tixel's servers by not setting too aggressive a poll interval
 - **Firewall**: Consider restricting outbound connections to only necessary domains

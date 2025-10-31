@@ -17,6 +17,7 @@ import yaml
 import signal
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Global flag for graceful shutdown
 shutdown_flag = False
@@ -264,6 +265,17 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
+    # Load environment variables from .env file
+    load_dotenv()
+
+    # Get Resend API key from environment
+    resend_api_key = os.getenv('RESEND_API_KEY')
+    if not resend_api_key:
+        print("Error: RESEND_API_KEY not found in .env file")
+        print("Please create a .env file with your Resend API key")
+        print("See .env.example for reference")
+        sys.exit(1)
+
     # Load configuration
     try:
         config = load_config()
@@ -278,7 +290,7 @@ def main():
     )
 
     # Set Resend API key
-    resend.api_key = config['email']['resend_api_key']
+    resend.api_key = resend_api_key
 
     # Get poll interval
     poll_interval = config['scraper']['poll_interval']

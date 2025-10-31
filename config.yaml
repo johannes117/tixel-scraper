@@ -1,0 +1,23 @@
+# Tixel Scraper Configuration File
+# Adjust the values below to match your needs
+
+# Email notification settings (using Resend API)
+# Note: The Resend API key is stored in the .env file for security
+email:
+  from_address: "notifications@yourdomain.com"
+  to_addresses:
+    - "user1@email.com"
+    - "user2@email.com"
+
+# Tixel URL to monitor
+scraper:
+  tixel_url: "https://tixel.com/au/music-tickets/your-event"
+  max_price: 150.0
+  desired_quantity: 2
+  # How often to check for tickets (in seconds)
+  poll_interval: 60
+
+# Logging configuration
+logging:
+  log_file: "tixel-scraper.log"
+  log_level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL

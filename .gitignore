@@ -1,5 +1,5 @@
-# Configuration files with secrets
-config.yaml
+# Environment files with secrets
+.env
 
 # Python
 venv/
